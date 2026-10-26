@@ -1,0 +1,62 @@
+"""CLI: python -m nl2sql [--db sample.db | --db postgresql://...] ["question"]  (no question -> interactive)."""
+
+import argparse
+import sys
+from pathlib import Path
+
+from .db import Database, format_table, open_database
+from .generator import DEFAULT_MODEL, NL2SQL, NL2SQLError
+from .sample_db import build
+
+
+def answer(engine: NL2SQL, question: str) -> None:
+    try:
+        res = engine.ask(question)
+    except NL2SQLError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return
+    if not res.answer.answerable:
+        print(f"Can't answer from this database: {res.answer.explanation}")
+        return
+    print(f"\nSQL:\n  {res.answer.sql}\n")
+    print(format_table(res.result))
+    print(f"\n{res.answer.explanation}")
+    if res.errors:
+        print(f"(repaired after: {'; '.join(res.errors)})")
+
+
+def open_db(target: str) -> Database:
+    """Open a SQLite path or database URL, creating the demo database on first use."""
+    if "://" not in target and not Path(target).exists():
+        if target != "sample.db":
+            raise SystemExit(f"{target} does not exist")
+        build(target)
+        print(f"created demo database {target}")
+    return open_database(target)
+
+
+def add_db_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--db", default="sample.db",
+                        help="SQLite file or database URL, e.g. postgresql://user@host/db "
+                             "(default: sample.db, created if missing)")
+    parser.add_argument("--model", default=DEFAULT_MODEL)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(prog="nl2sql", description=__doc__)
+    parser.add_argument("question", nargs="?", help="question in plain English")
+    add_db_args(parser)
+    args = parser.parse_args()
+
+    engine = NL2SQL(open_db(args.db), model=args.model)
+    if args.question:
+        answer(engine, args.question)
+        return
+
+    print("Ask a question (empty line to quit).")
+    while question := input("\n> ").strip():
+        answer(engine, question)
+
+
+if __name__ == "__main__":
+    main()

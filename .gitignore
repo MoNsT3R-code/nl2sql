@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 *.db
 .deps/
+PR_DESCRIPTION.md
+.dev/
