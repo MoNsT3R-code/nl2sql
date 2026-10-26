@@ -1,0 +1,52 @@
+# Local database servers loaded with the "bank" data, for trying nl2sql against a real server.
+#
+#   docker compose up -d                    # PostgreSQL on localhost:5432
+#   docker compose --profile mysql up -d    # also MySQL on localhost:3306
+#
+# Data loads only on the first start. To reload: docker compose down -v, then up again.
+# Set BANK_ADMIN_PASSWORD and BANK_READER_PASSWORD (e.g. in a .env file) to replace the
+# default passwords below. Both servers listen on localhost only.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: bank
+      POSTGRES_USER: bank_admin
+      POSTGRES_PASSWORD: ${BANK_ADMIN_PASSWORD:-change-me-admin}
+      READER_PASSWORD: ${BANK_READER_PASSWORD:-change-me-reader}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - ./db/bank/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./db/bank/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+      - ./db/bank/postgres_reader.sh:/docker-entrypoint-initdb.d/03_reader.sh:ro
+      - bank-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bank_admin -d bank"]
+      interval: 5s
+      retries: 10
+
+  mysql:
+    image: mysql:8.4
+    profiles: ["mysql"]
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    environment:
+      MYSQL_DATABASE: bank
+      MYSQL_ROOT_PASSWORD: ${BANK_ADMIN_PASSWORD:-change-me-admin}
+      READER_PASSWORD: ${BANK_READER_PASSWORD:-change-me-reader}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - ./db/bank/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./db/bank/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+      - ./db/bank/mysql_reader.sh:/docker-entrypoint-initdb.d/03_reader.sh:ro
+      - bank-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      retries: 20
+
+volumes:
+  bank-postgres:
+  bank-mysql:

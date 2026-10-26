@@ -26,19 +26,25 @@ def answer(engine: NL2SQL, question: str) -> None:
 
 
 def open_db(target: str) -> Database:
-    """Open a SQLite path or database URL, creating the demo database on first use."""
+    """Open a SQLite path or database URL. sample.db and bank.db are created on first use."""
     if "://" not in target and not Path(target).exists():
-        if target != "sample.db":
+        name = Path(target).name
+        if name == "sample.db":
+            build(target)
+        elif name == "bank.db":
+            from .bank_db import build_sqlite
+
+            build_sqlite(target)
+        else:
             raise SystemExit(f"{target} does not exist")
-        build(target)
-        print(f"created demo database {target}")
+        print(f"created database {target}")
     return open_database(target)
 
 
 def add_db_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--db", default="sample.db",
-                        help="SQLite file or database URL, e.g. postgresql://user@host/db "
-                             "(default: sample.db, created if missing)")
+                        help="SQLite file or database URL, e.g. postgresql+psycopg://user@host/bank "
+                             "(default: sample.db; sample.db and bank.db are created if missing)")
     parser.add_argument("--model", default=DEFAULT_MODEL)
 
 
