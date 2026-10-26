@@ -10,6 +10,16 @@ postgres = ["sqlalchemy>=2", "psycopg[binary]>=3"]
 mysql = ["sqlalchemy>=2", "pymysql"]
 dev = ["pytest", "sqlalchemy>=2"]
 
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["nl2sql"]
+
+[tool.setuptools.package-data]
+nl2sql = ["data/*.jsonl", "static/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "tests"]
