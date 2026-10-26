@@ -1,10 +1,10 @@
-# text2sql (prototype)
+# nl2sql (prototype)
 
 Ask a question in plain English, get back a SQL query, its results, and a short explanation.
 Uses Claude (`claude-opus-5-5`) with structured outputs against a SQLite database.
 
 ```
-$ python -m text2sql "Which customers spent the most on shipped orders?"
+$ python -m nl2sql "Which customers spent the most on shipped orders?"
 
 SQL:
   SELECT c.name, SUM(p.price_cents * oi.quantity) / 100.0 AS total_spent ...
@@ -27,7 +27,7 @@ Lucas Martin | 249.0
 4. **Self-repair** – if the SQL fails (bad column, guard rejection), the error is sent back and Claude
    gets one more attempt.
 5. **Refusals** – requests opt into server-side refusal fallbacks (`fallbacks: "default"`); a final
-   `refusal` stop reason surfaces as a `Text2SQLError`.
+   `refusal` stop reason surfaces as an `NL2SQLError`.
 
 ## Setup
 
@@ -40,18 +40,18 @@ Set `ANTHROPIC_API_KEY` (or log in with `ant auth login`).
 ## Usage
 
 ```bash
-python -m text2sql "How many orders were cancelled?"   # one-shot; creates sample.db if missing
-python -m text2sql                                     # interactive
-python -m text2sql --db path/to/your.db "..."          # your own SQLite file
+python -m nl2sql "How many orders were cancelled?"   # one-shot; creates sample.db if missing
+python -m nl2sql                                     # interactive
+python -m nl2sql --db path/to/your.db "..."          # your own SQLite file
 ```
 
 From Python:
 
 ```python
-from text2sql import Text2SQL
-from text2sql.db import connect_readonly
+from nl2sql import NL2SQL
+from nl2sql.db import connect_readonly
 
-engine = Text2SQL(connect_readonly("sample.db"))
+engine = NL2SQL(connect_readonly("sample.db"))
 res = engine.ask("Top 3 products by units sold")
 print(res.answer.sql, res.result.rows)
 ```

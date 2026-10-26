@@ -30,12 +30,12 @@ class SQLAnswer(BaseModel):
     explanation: str = Field(description="One or two sentences on how the query answers the question")
 
 
-class Text2SQLError(RuntimeError):
+class NL2SQLError(RuntimeError):
     pass
 
 
 @dataclass
-class Text2SQLResult:
+class NL2SQLResult:
     question: str
     answer: SQLAnswer
     result: QueryResult | None
@@ -43,7 +43,7 @@ class Text2SQLResult:
     errors: list[str] = field(default_factory=list)
 
 
-class Text2SQL:
+class NL2SQL:
     def __init__(self, conn: sqlite3.Connection, client=None, model: str = DEFAULT_MODEL,
                  max_attempts: int = 2):
         if client is None:
@@ -70,24 +70,24 @@ class Text2SQL:
             extra_body={"fallbacks": "default"},
         )
         if response.stop_reason == "refusal":
-            raise Text2SQLError("the model declined to answer this question")
+            raise NL2SQLError("the model declined to answer this question")
         if response.stop_reason == "max_tokens" or response.parsed_output is None:
-            raise Text2SQLError(f"no structured answer (stop_reason={response.stop_reason})")
+            raise NL2SQLError(f"no structured answer (stop_reason={response.stop_reason})")
         return response.parsed_output, response
 
-    def ask(self, question: str) -> Text2SQLResult:
+    def ask(self, question: str) -> NL2SQLResult:
         messages = [{"role": "user", "content": question}]
         errors: list[str] = []
 
         for attempt in range(1, self.max_attempts + 1):
             answer, response = self._generate(messages)
             if not answer.answerable:
-                return Text2SQLResult(question, answer, None, attempt, errors)
+                return NL2SQLResult(question, answer, None, attempt, errors)
 
             try:
                 sql = check_sql(answer.sql)
                 answer.sql = sql
-                return Text2SQLResult(question, answer, run_query(self.conn, sql), attempt, errors)
+                return NL2SQLResult(question, answer, run_query(self.conn, sql), attempt, errors)
             except (UnsafeSQLError, sqlite3.Error) as exc:
                 errors.append(f"{type(exc).__name__}: {exc}")
                 # Feed the error back so the model can repair its query.
@@ -97,4 +97,4 @@ class Text2SQL:
                     "content": f"That query failed with: {exc}\nReturn a corrected query.",
                 })
 
-        raise Text2SQLError(f"gave up after {self.max_attempts} attempts: {errors[-1]}")
+        raise NL2SQLError(f"gave up after {self.max_attempts} attempts: {errors[-1]}")

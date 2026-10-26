@@ -1,18 +1,18 @@
-"""CLI: python -m text2sql [--db sample.db] ["question"]  (no question -> interactive)."""
+"""CLI: python -m nl2sql [--db sample.db] ["question"]  (no question -> interactive)."""
 
 import argparse
 import sys
 from pathlib import Path
 
 from .db import connect_readonly, format_table
-from .generator import DEFAULT_MODEL, Text2SQL, Text2SQLError
+from .generator import DEFAULT_MODEL, NL2SQL, NL2SQLError
 from .sample_db import build
 
 
-def answer(engine: Text2SQL, question: str) -> None:
+def answer(engine: NL2SQL, question: str) -> None:
     try:
         res = engine.ask(question)
-    except Text2SQLError as exc:
+    except NL2SQLError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return
     if not res.answer.answerable:
@@ -26,7 +26,7 @@ def answer(engine: Text2SQL, question: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="text2sql", description=__doc__)
+    parser = argparse.ArgumentParser(prog="nl2sql", description=__doc__)
     parser.add_argument("question", nargs="?", help="question in plain English")
     parser.add_argument("--db", default="sample.db", help="SQLite file (default: sample.db)")
     parser.add_argument("--model", default=DEFAULT_MODEL)
@@ -38,7 +38,7 @@ def main() -> None:
         build(args.db)
         print(f"created demo database {args.db}")
 
-    engine = Text2SQL(connect_readonly(args.db), model=args.model)
+    engine = NL2SQL(connect_readonly(args.db), model=args.model)
     if args.question:
         answer(engine, args.question)
         return

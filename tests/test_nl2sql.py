@@ -3,11 +3,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from text2sql import SQLAnswer, Text2SQL, Text2SQLError
-from text2sql.db import connect_readonly, format_table, run_query
-from text2sql.guard import UnsafeSQLError, check_sql
-from text2sql.sample_db import build
-from text2sql.schema import describe_schema
+from nl2sql import SQLAnswer, NL2SQL, NL2SQLError
+from nl2sql.db import connect_readonly, format_table, run_query
+from nl2sql.guard import UnsafeSQLError, check_sql
+from nl2sql.sample_db import build
+from nl2sql.schema import describe_schema
 
 
 @pytest.fixture
@@ -90,7 +90,7 @@ def test_ask_runs_generated_sql(conn):
         sql="SELECT country, COUNT(*) AS n FROM customers GROUP BY country ORDER BY country;",
         explanation="Counts customers per country.",
     ))
-    res = Text2SQL(conn, client=client).ask("How many customers per country?")
+    res = NL2SQL(conn, client=client).ask("How many customers per country?")
 
     assert res.attempts == 1
     assert res.result.columns == ["country", "n"]
@@ -106,7 +106,7 @@ def test_ask_repairs_after_sql_error(conn):
         SQLAnswer(answerable=True, sql="SELECT nme FROM customers", explanation="typo"),
         SQLAnswer(answerable=True, sql="SELECT name FROM customers WHERE id = 1", explanation="fixed"),
     )
-    res = Text2SQL(conn, client=client).ask("Name of customer 1?")
+    res = NL2SQL(conn, client=client).ask("Name of customer 1?")
 
     assert res.attempts == 2
     assert res.result.rows == [("Ayesha Khan",)]
@@ -119,15 +119,15 @@ def test_ask_repairs_after_sql_error(conn):
 def test_ask_rejects_unsafe_sql_then_gives_up(conn):
     bad = SQLAnswer(answerable=True, sql="DROP TABLE customers", explanation="")
     client = FakeClient(bad, bad)
-    with pytest.raises(Text2SQLError, match="gave up"):
-        Text2SQL(conn, client=client).ask("Delete everything")
+    with pytest.raises(NL2SQLError, match="gave up"):
+        NL2SQL(conn, client=client).ask("Delete everything")
     # Table is still there.
     assert conn.execute("SELECT COUNT(*) FROM customers").fetchone() == (5,)
 
 
 def test_unanswerable_question(conn):
     client = FakeClient(SQLAnswer(answerable=False, sql="", explanation="No weather data."))
-    res = Text2SQL(conn, client=client).ask("What's the weather?")
+    res = NL2SQL(conn, client=client).ask("What's the weather?")
     assert res.result is None
     assert not res.answer.answerable
 
@@ -135,5 +135,5 @@ def test_unanswerable_question(conn):
 def test_refusal_raises(conn):
     client = FakeClient(SQLAnswer(answerable=True, sql="SELECT 1", explanation=""),
                         stop_reason="refusal")
-    with pytest.raises(Text2SQLError, match="declined"):
-        Text2SQL(conn, client=client).ask("?")
+    with pytest.raises(NL2SQLError, match="declined"):
+        NL2SQL(conn, client=client).ask("?")
