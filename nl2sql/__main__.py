@@ -1,10 +1,10 @@
-"""CLI: python -m nl2sql [--db sample.db] ["question"]  (no question -> interactive)."""
+"""CLI: python -m nl2sql [--db sample.db | --db postgresql://...] ["question"]  (no question -> interactive)."""
 
 import argparse
 import sys
 from pathlib import Path
 
-from .db import connect_readonly, format_table
+from .db import Database, format_table, open_database
 from .generator import DEFAULT_MODEL, NL2SQL, NL2SQLError
 from .sample_db import build
 
@@ -25,20 +25,30 @@ def answer(engine: NL2SQL, question: str) -> None:
         print(f"(repaired after: {'; '.join(res.errors)})")
 
 
+def open_db(target: str) -> Database:
+    """Open a SQLite path or database URL, creating the demo database on first use."""
+    if "://" not in target and not Path(target).exists():
+        if target != "sample.db":
+            raise SystemExit(f"{target} does not exist")
+        build(target)
+        print(f"created demo database {target}")
+    return open_database(target)
+
+
+def add_db_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--db", default="sample.db",
+                        help="SQLite file or database URL, e.g. postgresql://user@host/db "
+                             "(default: sample.db, created if missing)")
+    parser.add_argument("--model", default=DEFAULT_MODEL)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="nl2sql", description=__doc__)
     parser.add_argument("question", nargs="?", help="question in plain English")
-    parser.add_argument("--db", default="sample.db", help="SQLite file (default: sample.db)")
-    parser.add_argument("--model", default=DEFAULT_MODEL)
+    add_db_args(parser)
     args = parser.parse_args()
 
-    if not Path(args.db).exists():
-        if args.db != "sample.db":
-            parser.error(f"{args.db} does not exist")
-        build(args.db)
-        print(f"created demo database {args.db}")
-
-    engine = NL2SQL(connect_readonly(args.db), model=args.model)
+    engine = NL2SQL(open_db(args.db), model=args.model)
     if args.question:
         answer(engine, args.question)
         return

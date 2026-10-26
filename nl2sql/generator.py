@@ -1,24 +1,24 @@
 """Natural language -> SQL with Claude, with one self-repair retry on errors."""
 
-import sqlite3
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
 
-from .db import QueryResult, run_query
+from .db import Database, QueryResult
 from .guard import UnsafeSQLError, check_sql
-from .schema import describe_schema
+from .schema import describe_schema, select_tables
 
 DEFAULT_MODEL = "claude-opus-5-5"
 
-SYSTEM_PROMPT = """You translate questions into a single SQLite SELECT query.
+SYSTEM_PROMPT = """You translate questions into a single {dialect} SELECT query.
 
 Rules:
-- Use only tables and columns that exist in the schema below.
+- Use only tables and columns that exist in the schema below, and {dialect} syntax.
 - Produce exactly one read-only query (SELECT or WITH ... SELECT). Never modify data.
 - Prefer explicit column names over SELECT *, and give computed columns readable aliases.
 - If the question cannot be answered from this schema, set `answerable` to false,
-  leave `sql` empty, and explain why in `explanation`.
+  leave `sql` empty, and explain why in `explanation`. If it needs a table whose columns
+  are not shown, say which table in `explanation`.
 
 Schema:
 {schema}"""
@@ -26,7 +26,7 @@ Schema:
 
 class SQLAnswer(BaseModel):
     answerable: bool = Field(description="False if the schema cannot answer the question")
-    sql: str = Field(description="A single SQLite SELECT query, or empty if unanswerable")
+    sql: str = Field(description="A single SELECT query, or empty if unanswerable")
     explanation: str = Field(description="One or two sentences on how the query answers the question")
 
 
@@ -41,28 +41,39 @@ class NL2SQLResult:
     result: QueryResult | None
     attempts: int
     errors: list[str] = field(default_factory=list)
+    tables: list[str] = field(default_factory=list)  # tables whose definitions were in the prompt
 
 
 class NL2SQL:
-    def __init__(self, conn: sqlite3.Connection, client=None, model: str = DEFAULT_MODEL,
-                 max_attempts: int = 2):
+    def __init__(self, db: Database, client=None, model: str = DEFAULT_MODEL,
+                 max_attempts: int = 2, full_schema_limit: int = 30, max_tables: int = 12):
+        """Schemas with up to `full_schema_limit` tables go into the prompt whole (and cached).
+        Larger ones get a per-question selection of at most `max_tables` tables."""
         if client is None:
             import anthropic
 
             client = anthropic.Anthropic()
-        self.conn = conn
+        self.db = db
         self.client = client
         self.model = model
         self.max_attempts = max_attempts
-        self.system = SYSTEM_PROMPT.format(schema=describe_schema(conn))
+        self.max_tables = max_tables
+        self.tables = db.tables()
+        self.large_schema = len(self.tables) > full_schema_limit
+        self._full_system = None if self.large_schema else self._system(self.tables)
 
-    def _generate(self, messages: list) -> tuple[SQLAnswer, object]:
+    def _system(self, tables) -> str:
+        names = {t.name for t in tables}
+        others = [t.name for t in self.tables if t.name not in names]
+        schema = describe_schema(self.db, tables, other_tables=others)
+        return SYSTEM_PROMPT.format(dialect=self.db.dialect, schema=schema)
+
+    def _generate(self, system: str, messages: list) -> tuple[SQLAnswer, object]:
         response = self.client.messages.parse(
             model=self.model,
             max_tokens=16000,
-            # The schema prompt is identical across questions, so cache it.
-            system=[{"type": "text", "text": self.system,
-                     "cache_control": {"type": "ephemeral"}}],
+            # The schema prompt repeats across questions (and retries), so cache it.
+            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             messages=messages,
             output_format=SQLAnswer,
             # Route safety-classifier refusals to a fallback model server-side.
@@ -76,19 +87,27 @@ class NL2SQL:
         return response.parsed_output, response
 
     def ask(self, question: str) -> NL2SQLResult:
+        if self.large_schema:
+            tables = select_tables(self.tables, question, self.max_tables)
+            system = self._system(tables)
+        else:
+            tables, system = self.tables, self._full_system
+        table_names = [t.name for t in tables]
+
         messages = [{"role": "user", "content": question}]
         errors: list[str] = []
 
         for attempt in range(1, self.max_attempts + 1):
-            answer, response = self._generate(messages)
+            answer, response = self._generate(system, messages)
             if not answer.answerable:
-                return NL2SQLResult(question, answer, None, attempt, errors)
+                return NL2SQLResult(question, answer, None, attempt, errors, table_names)
 
             try:
                 sql = check_sql(answer.sql)
                 answer.sql = sql
-                return NL2SQLResult(question, answer, run_query(self.conn, sql), attempt, errors)
-            except (UnsafeSQLError, sqlite3.Error) as exc:
+                result = self.db.run(sql)
+                return NL2SQLResult(question, answer, result, attempt, errors, table_names)
+            except (UnsafeSQLError, *self.db.errors) as exc:
                 errors.append(f"{type(exc).__name__}: {exc}")
                 # Feed the error back so the model can repair its query.
                 messages.append({"role": "assistant", "content": response.content})
