@@ -1,0 +1,13 @@
+[project]
+name = "text2sql"
+version = "0.1.0"
+description = "Prototype: ask questions in plain English, get SQL and results from a SQLite database using Claude"
+requires-python = ">=3.10"
+dependencies = ["anthropic", "pydantic>=2"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
