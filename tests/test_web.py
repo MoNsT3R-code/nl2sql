@@ -1,4 +1,5 @@
 import json
+import socket
 import threading
 import urllib.error
 import urllib.request
@@ -64,6 +65,19 @@ def test_ask_flow(server):
 
     status, data = post(server + "/api/ask", {"question": "Drop it"})
     assert status == 422 and "gave up" in data["error"]
+
+
+def test_idle_connection_does_not_block_requests(server):
+    # Browsers open spare connections and leave them idle; a single-threaded server
+    # would wait on that socket forever and never answer the real request.
+    host, port = server.removeprefix("http://").split(":")
+    idle = socket.create_connection((host, int(port)))
+    try:
+        req = urllib.request.Request(server + "/api/info")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            assert resp.status == 200
+    finally:
+        idle.close()
 
 
 @pytest.mark.parametrize("payload", [{}, {"question": ""}, {"question": "x" * 3000}])

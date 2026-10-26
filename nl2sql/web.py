@@ -1,13 +1,15 @@
 """Local web UI: python -m nl2sql.web [--db ...] [--port 8000], then open http://127.0.0.1:8000
 
-Uses only the standard library. Requests are handled one at a time, which keeps the
-single database connection and the NL2SQL engine safe to share.
+Uses only the standard library. Connections get their own threads (browsers open idle
+spare connections that would otherwise block a single-threaded server), but questions
+are answered one at a time under a lock, so the database connection is never shared.
 """
 
 import argparse
 import json
+import threading
 from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .generator import NL2SQL, NL2SQLError
@@ -34,6 +36,8 @@ def result_payload(res) -> dict:
 
 
 def make_handler(engine: NL2SQL, model: str):
+    lock = threading.Lock()
+
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status: int, body: bytes, content_type: str) -> None:
             self.send_response(status)
@@ -74,7 +78,9 @@ def make_handler(engine: NL2SQL, model: str):
                 return self._json(HTTPStatus.BAD_REQUEST,
                                   {"error": f"question must be 1-{MAX_QUESTION} characters"})
             try:
-                self._json(HTTPStatus.OK, result_payload(engine.ask(question)))
+                with lock:
+                    payload = result_payload(engine.ask(question))
+                self._json(HTTPStatus.OK, payload)
             except NL2SQLError as exc:
                 self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
 
@@ -85,8 +91,9 @@ def make_handler(engine: NL2SQL, model: str):
     return Handler
 
 
-def serve(engine: NL2SQL, model: str, host: str = "127.0.0.1", port: int = 8000) -> HTTPServer:
-    return HTTPServer((host, port), make_handler(engine, model))
+def serve(engine: NL2SQL, model: str, host: str = "127.0.0.1",
+          port: int = 8000) -> ThreadingHTTPServer:
+    return ThreadingHTTPServer((host, port), make_handler(engine, model))
 
 
 def main() -> None:
