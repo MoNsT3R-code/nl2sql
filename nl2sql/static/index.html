@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nl2sql</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --border: #e2e5ea; --text: #16191d; --muted: #5d6673;
+    --accent: #2f6fde; --accent-text: #ffffff; --code-bg: #f1f3f6; --error: #c0392b;
+    --error-bg: #fdf0ee; --warn-bg: #fff7e6; --warn: #8a5a00;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111316; --surface: #1a1d21; --border: #2c3138; --text: #e7e9ec; --muted: #9aa3ae;
+      --accent: #5b8ff0; --accent-text: #0d1117; --code-bg: #22262c; --error: #f08070;
+      --error-bg: #2a1b1a; --warn-bg: #2a2416; --warn: #e3b55b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 920px; margin: 0 auto; padding: 32px 16px 64px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  h1 span { color: var(--muted); font-weight: 400; }
+  .meta { color: var(--muted); font-size: 13px; }
+  form { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  textarea {
+    width: 100%; min-height: 64px; resize: vertical; border: 0; outline: none; background: transparent;
+    color: inherit; font: inherit; font-size: 16px;
+  }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .hint { color: var(--muted); font-size: 12px; }
+  button {
+    font: inherit; border-radius: 7px; border: 1px solid var(--border); background: var(--surface);
+    color: inherit; padding: 6px 12px; cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button:disabled { opacity: .6; cursor: progress; }
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 28px; }
+  .examples button { font-size: 13px; color: var(--muted); border-radius: 999px; text-align: left; }
+  .examples button:hover { color: var(--text); border-color: var(--muted); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .q { font-weight: 600; margin: 0 0 10px; }
+  .sql { position: relative; }
+  pre {
+    margin: 0; background: var(--code-bg); border-radius: 7px; padding: 12px 14px; overflow-x: auto;
+    font: 13px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word;
+  }
+  .copy { position: absolute; top: 6px; right: 6px; font-size: 12px; padding: 2px 8px; }
+  .explain { color: var(--muted); margin: 10px 0 0; }
+  .table-wrap { overflow-x: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 7px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { background: var(--code-bg); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .note { font-size: 13px; margin-top: 10px; padding: 8px 10px; border-radius: 7px; background: var(--warn-bg); color: var(--warn); }
+  .error { background: var(--error-bg); color: var(--error); }
+  .muted { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  .pending { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>nl2sql <span>· ask your database</span></h1>
+    <div class="meta" id="meta">Connecting…</div>
+  </header>
+
+  <form id="ask">
+    <textarea id="question" placeholder="e.g. Which customers spent the most on shipped orders?" maxlength="2000" required></textarea>
+    <div class="row">
+      <span class="hint">Ctrl+Enter to ask · queries run read-only</span>
+      <button class="primary" id="submit" type="submit">Ask</button>
+    </div>
+  </form>
+
+  <div class="examples" id="examples"></div>
+  <section id="results" aria-live="polite"></section>
+</main>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const el = (tag, cls, text) => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text != null) node.textContent = text;
+  return node;
+};
+
+const EXAMPLES = [
+  "How many orders are there in each status?",
+  "Which customer spent the most on shipped orders?",
+  "Which products did Omar Haddad order?",
+  "What is the average order value in dollars, excluding cancelled orders?",
+];
+
+fetch("/api/info").then((r) => r.json()).then((info) => {
+  $("#meta").textContent = `${info.dialect} · ${info.tables.length} tables · ${info.model}`;
+  $("#meta").title = info.tables.join(", ");
+  // Example questions only make sense for the bundled demo database.
+  const demo = ["customers", "orders", "order_items", "products"].every((t) => info.tables.includes(t));
+  if (demo) {
+    for (const q of EXAMPLES) {
+      const b = el("button", null, q);
+      b.type = "button";
+      b.onclick = () => { $("#question").value = q; ask(); };
+      $("#examples").append(b);
+    }
+  }
+}).catch(() => { $("#meta").textContent = "Server not reachable"; });
+
+function renderTable(columns, rows) {
+  const wrap = el("div", "table-wrap");
+  const table = el("table");
+  const head = el("tr");
+  columns.forEach((c) => head.append(el("th", null, c)));
+  table.appendChild(el("thead")).append(head);
+  const body = table.appendChild(el("tbody"));
+  if (!rows.length) {
+    const tr = el("tr");
+    const td = el("td", "pending", "No rows");
+    td.colSpan = Math.max(columns.length, 1);
+    tr.append(td);
+    body.append(tr);
+  }
+  for (const row of rows) {
+    const tr = el("tr");
+    row.forEach((v) => tr.append(el("td", typeof v === "number" ? "num" : null, v === null ? "NULL" : String(v))));
+    body.append(tr);
+  }
+  wrap.append(table);
+  return wrap;
+}
+
+function renderResult(card, data) {
+  card.querySelector(".pending")?.remove();
+  if (data.error) {
+    card.append(el("div", "note error", data.error));
+    return;
+  }
+  if (!data.answerable) {
+    card.append(el("div", "note", "Can't answer this from the database: " + data.explanation));
+    return;
+  }
+  const sql = el("div", "sql");
+  sql.append(el("pre", null, data.sql));
+  const copy = el("button", "copy", "Copy");
+  copy.type = "button";
+  copy.onclick = () => navigator.clipboard?.writeText(data.sql).then(() => {
+    copy.textContent = "Copied";
+    setTimeout(() => (copy.textContent = "Copy"), 1200);
+  });
+  sql.append(copy);
+  card.append(sql, el("p", "explain", data.explanation), renderTable(data.columns, data.rows));
+  if (data.truncated) card.append(el("div", "muted", `Showing the first ${data.rows.length} rows.`));
+  if (data.repairs.length) {
+    card.append(el("div", "muted", `Fixed after ${data.repairs.length} failed attempt(s): ${data.repairs.join("; ")}`));
+  }
+}
+
+async function ask() {
+  const question = $("#question").value.trim();
+  if (!question) return;
+  const card = el("article", "card");
+  card.append(el("p", "q", question), el("div", "pending", "Thinking…"));
+  $("#results").prepend(card);
+  $("#submit").disabled = true;
+  try {
+    const resp = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    renderResult(card, await resp.json());
+    $("#question").value = "";
+  } catch (err) {
+    renderResult(card, { error: "Request failed: " + err.message });
+  } finally {
+    $("#submit").disabled = false;
+    $("#question").focus();
+  }
+}
+
+$("#ask").addEventListener("submit", (e) => { e.preventDefault(); ask(); });
+$("#question").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ask(); }
+});
+</script>
+</body>
+</html>
