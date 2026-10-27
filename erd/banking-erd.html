@@ -1,0 +1,1505 @@
+<meta charset="utf-8">
+<title>Banking System ERD</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: a modelling workbench. Wide diagram canvas with a detail rail, then reference
+     sections (relationships, entity catalogue, SQL/Mermaid export) as plain documents. */
+  :root {
+    --bg: #eef0ec;           /* drafting-paper grey-green */
+    --surface: #fbfcfa;
+    --surface-2: #f3f5f1;
+    --ink: #1d2420;
+    --muted: #5b665f;
+    --line: #d3d9d2;
+    --edge: #9aa59d;
+    --accent: #0f6b5c;       /* ledger green */
+    --accent-soft: #d6ebe5;
+    --pk: #9a6a00;
+    --fk: #2f5fa7;
+    --d-org: #4f5d8a; --d-cust: #1f7a6d; --d-acct: #3d7a2f;
+    --d-card: #a5651a; --d-pay: #7a4a9a; --d-loan: #a8434f;
+    --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+    --font-ui: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121614; --surface: #1a1f1c; --surface-2: #202622; --ink: #e4e9e5; --muted: #9aa69f;
+      --line: #2e3631; --edge: #56625a; --accent: #4fc2a9; --accent-soft: #1d3a33;
+      --pk: #e3b04b; --fk: #84aef0;
+      --d-org: #8f9bd0; --d-cust: #5cc0b0; --d-acct: #86c26f; --d-card: #e3a35a; --d-pay: #b991d6; --d-loan: #e48390;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121614; --surface: #1a1f1c; --surface-2: #202622; --ink: #e4e9e5; --muted: #9aa69f;
+    --line: #2e3631; --edge: #56625a; --accent: #4fc2a9; --accent-soft: #1d3a33;
+    --pk: #e3b04b; --fk: #84aef0;
+    --d-org: #8f9bd0; --d-cust: #5cc0b0; --d-acct: #86c26f; --d-card: #e3a35a; --d-pay: #b991d6; --d-loan: #e48390;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 64px;
+  }
+  .wrap { max-width: 1440px; margin: 0 auto; display: grid; gap: 40px; }
+  h1, h2 { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(32px, 5vw, 48px); line-height: 1.05; }
+  h2 { font-size: 30px; }
+  h3 { font-size: 15px; margin: 0; }
+  p { margin: 0; }
+  .lede { color: var(--muted); max-width: 70ch; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  code, .mono { font-family: var(--font-mono); font-size: .88em; }
+
+  header.top { display: grid; gap: 14px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 6px; }
+  .stat { display: grid; }
+  .stat b { font-family: var(--font-display); font-size: 34px; font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+
+  /* ---- workbench ---- */
+  .bench { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 0; background: var(--surface);
+           border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .toolbar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+             padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  .toolbar .grow { flex: 1; }
+  .btn { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+         border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  .btn:hover { border-color: var(--edge); }
+  .btn:focus-visible, select:focus-visible, .chip:focus-visible, .ent-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  select { font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line);
+           background: var(--surface); color: var(--ink); max-width: 100%; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: inherit; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px;
+          border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .chip i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+  .chip[aria-pressed="true"] { border-color: var(--ink); }
+  .canvas { position: relative; height: min(78vh, 860px); min-height: 480px; overflow: hidden; cursor: grab;
+            background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 22px 22px; touch-action: none; }
+  .canvas.dragging { cursor: grabbing; }
+  .canvas #erd { width: 100%; height: 100%; display: block; user-select: none; }
+  .canvas .minimap { display: block; height: auto; user-select: none; }
+  .hint { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--muted); background: var(--surface);
+          padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); pointer-events: none; }
+
+  /* svg parts */
+  .box rect.body { fill: var(--surface); stroke: var(--line); }
+  .box rect.head { stroke: none; }
+  .box text { font-family: var(--font-mono); font-size: 11.5px; fill: var(--ink); }
+  .box text.title { font-family: var(--font-ui); font-weight: 700; font-size: 13.5px; fill: #fff; }
+  .box text.type { fill: var(--muted); font-size: 10.5px; }
+  .box text.key-pk { fill: var(--pk); font-weight: 600; font-size: 10px; }
+  .box text.key-fk { fill: var(--fk); font-weight: 600; font-size: 10px; }
+  .box line.sep { stroke: var(--line); }
+  .box { cursor: pointer; transition: opacity .15s; }
+  .box.sel rect.body { stroke: var(--ink); stroke-width: 2; }
+  .edge { fill: none; stroke: var(--edge); stroke-width: 1.2; transition: opacity .15s, stroke .15s; }
+  .edge-mark { fill: none; stroke: var(--edge); stroke-width: 1.2; }
+  .edge-mark.dot { fill: var(--surface); }
+  g.rel { transition: opacity .15s; }
+  g.rel.hot .edge, g.rel.hot .edge-mark { stroke: var(--accent); stroke-width: 2.2; }
+  /* Unrelated tables fade only slightly, so their columns stay readable at any zoom. */
+  svg.focus .box.dim { opacity: .55; }
+  svg.focus g.rel.dim { opacity: .25; }
+
+  /* search */
+  .search { position: relative; flex: 1 1 260px; max-width: 380px; min-width: 0; }
+  .search input { width: 100%; font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--line);
+                  background: var(--surface); color: var(--ink); }
+  .search input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #qres { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none;
+          background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgb(0 0 0 / .14);
+          max-height: 360px; overflow: auto; min-width: min(380px, 86vw); }
+  #qres li { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; padding: 6px 8px; border-radius: 5px; cursor: pointer; align-items: baseline; }
+  #qres li[aria-selected="true"], #qres li:hover { background: var(--accent-soft); }
+  #qres .kind { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; width: 46px; }
+  #qres .lab { font-size: 13.5px; overflow-wrap: anywhere; }
+  #qres .sub { grid-column: 2; font-size: 12px; color: var(--muted); }
+  #qres mark { background: none; color: var(--accent); font-weight: 700; }
+  #qres .none { display: block; color: var(--muted); font-size: 13px; cursor: default; }
+
+  /* detail level */
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--surface); }
+  .seg button { font: inherit; font-size: 13px; border: 0; background: none; color: var(--muted); padding: 6px 11px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-checked="true"] { background: var(--ink); color: var(--surface); }
+  .seg button:focus-visible, .tabs button:focus-visible, #qres li:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .zoom { display: inline-flex; gap: 4px; }
+  .toolbar .chips { flex-basis: 100%; }
+
+  /* minimap */
+  .minimap { position: absolute; right: 10px; bottom: 10px; width: 190px; background: var(--surface); border: 1px solid var(--line);
+             border-radius: 6px; cursor: pointer; box-shadow: 0 4px 14px rgb(0 0 0 / .08); }
+  .minimap .vp { fill: var(--accent); fill-opacity: .12; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+  .canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  /* rows that can flash when found by search */
+  .rowbg { fill: transparent; }
+  .rowbg.flash { animation: rowflash 2.6s ease-out; }
+  @keyframes rowflash { 0%, 45% { fill: var(--accent-soft); } 100% { fill: transparent; } }
+  .box text.summary { font-family: var(--font-ui); font-size: 12px; fill: var(--muted); }
+
+  /* tool rail */
+  .rail { border-left: 1px solid var(--line); overflow: auto; height: min(78vh, 860px); min-height: 480px;
+          display: flex; flex-direction: column; }
+  .tabs { display: flex; position: sticky; top: 0; z-index: 2; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+  .tabs button { flex: 1; font: inherit; font-size: 13px; font-weight: 600; padding: 10px 6px; border: 0; background: none; color: var(--muted);
+                 cursor: pointer; border-bottom: 2px solid transparent; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .pane { padding: 16px; display: grid; align-content: start; gap: 16px; }
+  .rail .empty { color: var(--muted); font-size: 14px; display: grid; gap: 12px; }
+  .starts { display: grid; gap: 8px; }
+  .start { font: inherit; text-align: left; display: grid; gap: 2px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+           background: var(--surface-2); color: var(--ink); cursor: pointer; }
+  .start:hover { border-color: var(--accent); }
+  .start b { font-size: 14px; }
+  .start span { font-size: 12.5px; color: var(--muted); }
+  .sentences { display: grid; gap: 7px; font-size: 13.5px; list-style: none; margin: 0; padding: 0; }
+  .sentences li { padding-left: 14px; position: relative; }
+  .sentences li::before { content: ""; position: absolute; left: 0; top: .6em; width: 6px; height: 6px; border-radius: 50%; background: var(--edge); }
+  .sentences code { color: var(--muted); }
+  .samples span.hit { background: var(--accent-soft); border-color: var(--accent); }
+
+  /* connect */
+  .pickers { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: end; }
+  .pickers label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+  .pickers select { width: 100%; }
+  .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .chain .node { font-size: 13px; font-weight: 600; padding: 3px 9px; border-radius: 999px; color: #fff; }
+  .chain .arrow { color: var(--muted); font-size: 13px; }
+  .steps { display: grid; gap: 8px; margin: 0; padding-left: 20px; font-size: 13.5px; }
+  .code { margin: 0; padding: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; overflow: auto;
+          font-family: var(--font-mono); font-size: 12px; line-height: 1.55; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
+  /* stories */
+  .story { font: inherit; text-align: left; display: grid; gap: 3px; padding: 12px; border-radius: 8px; border: 1px solid var(--line);
+           background: var(--surface-2); color: var(--ink); cursor: pointer; }
+  .story:hover { border-color: var(--accent); }
+  .story b { font-size: 15px; }
+  .story span { font-size: 12.5px; color: var(--muted); }
+  .progress { display: flex; gap: 5px; }
+  .progress i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+  .progress i.on { background: var(--accent); }
+  .narration { font-size: 15px; line-height: 1.55; }
+  .nav { display: flex; gap: 8px; justify-content: space-between; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 600; }
+  .dom-tag { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+  .rail h3 { font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 1.1; }
+  .kv { display: grid; gap: 4px; font-size: 13px; }
+  .kv-title { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .ent-link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline;
+              text-underline-offset: 2px; }
+  ul.plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+  table.attrs { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.attrs td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.attrs td:first-child { font-family: var(--font-mono); font-size: 12px; }
+  table.attrs td:last-child { color: var(--muted); font-family: var(--font-mono); font-size: 11px; text-align: right; white-space: nowrap; }
+  .samples { display: flex; flex-wrap: wrap; gap: 5px; }
+  .samples span { font-size: 12px; padding: 2px 8px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--line); }
+  .badge { font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 0 5px; border-radius: 3px; margin-right: 6px; }
+  .badge.pk { color: var(--pk); border: 1px solid var(--pk); }
+  .badge.fk { color: var(--fk); border: 1px solid var(--fk); }
+
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px 26px; align-items: center; font-size: 13px; color: var(--muted); }
+  .legend svg { vertical-align: middle; }
+  .legend .ln { stroke: var(--ink); stroke-width: 1.4; fill: none; }
+  .legend .dt { stroke: var(--ink); stroke-width: 1.4; fill: var(--bg); }
+
+  /* reference sections */
+  section.ref { display: grid; gap: 16px; }
+  .scroll-x { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  table.rels { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 860px; }
+  table.rels th { text-align: left; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+                  padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); position: sticky; top: 0; }
+  table.rels td { padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.rels tr:last-child td { border-bottom: 0; }
+  table.rels td.n { color: var(--muted); font-variant-numeric: tabular-nums; width: 3ch; }
+  .card-pill { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+  .opt { font-size: 12px; color: var(--muted); }
+
+  .catalogue { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 16px; }
+  .ent { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0 0 14px; display: grid; gap: 12px;
+         align-content: start; overflow: hidden; scroll-margin-top: 20px; min-width: 0; }
+  .ent-head { padding: 10px 14px; color: #fff; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .ent-head h3 { font-size: 16px; }
+  .ent-head span { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; opacity: .9; }
+  .ent > :not(.ent-head) { margin: 0 14px; }
+  .ent p.desc { font-size: 13.5px; color: var(--muted); }
+
+  .export { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 16px; }
+  .code-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; display: grid; min-width: 0; }
+  .code-panel header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .code-panel pre { margin: 0; padding: 14px; overflow: auto; max-height: 460px; font-family: var(--font-mono); font-size: 12px; line-height: 1.55; }
+  footer { color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 960px) {
+    .bench { grid-template-columns: minmax(0, 1fr); }
+    .rail { border-left: 0; border-top: 1px solid var(--line); height: auto; min-height: 0; }
+    .canvas { height: 62vh; min-height: 400px; }
+    .minimap { width: 130px; }
+    .hint { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  /* #poster: the whole diagram at 1:1 for saving as an image */
+  body.poster .wrap { max-width: none; gap: 18px; }
+  body.poster section.ref, body.poster footer, body.poster .toolbar, body.poster .rail, body.poster .hint, body.poster .lede,
+  body.poster .minimap { display: none; }
+  body.poster .bench { display: block; border: 0; background: none; }
+  body.poster .canvas { height: auto; min-height: 0; overflow: visible; background-image: none; cursor: default; }
+  body.poster .canvas #erd { width: auto; height: auto; }
+  /* #values: the entity catalogue alone, for saving the example values as an image */
+  body.values .wrap { max-width: 2200px; gap: 18px; }
+  body.values .bench, body.values .legend, body.values #relationships, body.values #export, body.values footer,
+  body.values .stats, body.values .lede { display: none; }
+  body.values .catalogue { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  body.values .ent .kv:not(:last-child) { display: none; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Entity–relationship model · Retail &amp; consumer bank, Pakistan</span>
+    <h1>Banking Management System</h1>
+    <p class="lede">A complete logical data model for a Pakistani retail bank: branches and staff, customers and KYC,
+      accounts in PKR and foreign currency, debit, credit and member cards, Raast and 1LINK payments, and lending.
+      Every entity has one primary key, exactly ten attributes and ten example values. The entities are joined by
+      fifty foreign keys.</p>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div class="legend" aria-label="Notation">
+    <span><span class="badge pk">PK</span>primary key</span>
+    <span><span class="badge fk">FK</span>foreign key</span>
+    <span><svg width="60" height="16" aria-hidden="true"><path class="ln" d="M2 8H58M10 3V13"/><path class="ln" d="M46 8L58 2M46 8L58 14M46 8H58"/></svg> one to many</span>
+    <span><svg width="60" height="16" aria-hidden="true"><path class="ln" d="M2 8H58"/><circle class="dt" cx="12" cy="8" r="4"/><path class="ln" d="M46 8L58 2M46 8L58 14"/></svg> optional parent (nullable FK)</span>
+    <span><svg width="60" height="16" aria-hidden="true"><path class="ln" d="M2 8H58M10 3V13M50 3V13"/></svg> one to one</span>
+  </div>
+
+  <div class="bench">
+    <div class="toolbar">
+      <div class="search">
+        <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Search tables, columns, values… try “Raast”"
+               aria-label="Search tables, columns and example values" role="combobox" aria-expanded="false" aria-controls="qres">
+        <ul id="qres" role="listbox" hidden></ul>
+      </div>
+      <div class="seg" role="radiogroup" aria-label="How much detail to show" id="modes"></div>
+      <span class="grow"></span>
+      <div class="zoom">
+        <button class="btn" id="zout" type="button" aria-label="Zoom out">−</button>
+        <button class="btn" id="fit" type="button">Fit all</button>
+        <button class="btn" id="zin" type="button" aria-label="Zoom in">+</button>
+      </div>
+      <div class="chips" id="domains" aria-label="Highlight a subject area"></div>
+    </div>
+    <div class="canvas" id="canvas" aria-label="Diagram. Drag to move, arrow keys pan, plus and minus zoom.">
+      <svg id="erd" role="img" aria-label="Entity-relationship diagram of the banking management system"></svg>
+      <span class="hint">Drag to move · Ctrl + scroll or pinch to zoom · click a table</span>
+      <svg class="minimap" id="mini" role="img" aria-label="Minimap. Click to jump to that part of the diagram."></svg>
+    </div>
+    <aside class="rail" id="rail">
+      <div class="tabs" role="tablist" aria-label="Tools">
+        <button role="tab" type="button" id="tab-details" aria-controls="pane-details" aria-selected="true">Details</button>
+        <button role="tab" type="button" id="tab-connect" aria-controls="pane-connect" aria-selected="false">Connect two tables</button>
+        <button role="tab" type="button" id="tab-stories" aria-controls="pane-stories" aria-selected="false">Stories</button>
+      </div>
+      <div class="pane" role="tabpanel" id="pane-details" aria-labelledby="tab-details" aria-live="polite"></div>
+      <div class="pane" role="tabpanel" id="pane-connect" aria-labelledby="tab-connect" hidden></div>
+      <div class="pane" role="tabpanel" id="pane-stories" aria-labelledby="tab-stories" hidden></div>
+    </aside>
+  </div>
+
+  <section class="ref" id="relationships">
+    <div>
+      <span class="eyebrow">Relationships</span>
+      <h2>All fifty foreign keys</h2>
+    </div>
+    <p class="lede">Each row is one foreign key, read from the parent: the parent entity on the left relates to the child
+      entity that holds the key. "Optional" means the key may be empty (NULL).</p>
+    <div class="scroll-x"><table class="rels" id="rels"></table></div>
+  </section>
+
+  <section class="ref" id="entities">
+    <div>
+      <span class="eyebrow">Entity catalogue</span>
+      <h2>Twenty entities, ten attributes each</h2>
+    </div>
+    <div class="catalogue" id="catalogue"></div>
+  </section>
+
+  <section class="ref" id="export">
+    <div>
+      <span class="eyebrow">Export</span>
+      <h2>SQL and Mermaid</h2>
+    </div>
+    <p class="lede">The same model as PostgreSQL DDL (tables first, then the foreign keys, so the order of creation doesn't
+      matter) and as a Mermaid <code>erDiagram</code> you can paste into GitHub, Notion or draw.io.</p>
+    <div class="export">
+      <div class="code-panel"><header><h3>PostgreSQL schema</h3><button class="btn" type="button" data-copy="sql">Copy</button></header><pre id="sql"></pre></div>
+      <div class="code-panel"><header><h3>Mermaid erDiagram</h3><button class="btn" type="button" data-copy="mmd">Copy</button></header><pre id="mmd"></pre></div>
+    </div>
+  </section>
+
+  <footer>Example values are illustrative. Card numbers are masked, and IBANs use the fictional bank code NBMS.</footer>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------------------------
+// The model. fk: [column, parent entity, phrase read from the parent, cardinality, nullable]
+// ---------------------------------------------------------------------------------------------
+const DOMAINS = {
+  org:  { name: "Organisation", color: "--d-org" },
+  cust: { name: "Customers",    color: "--d-cust" },
+  acct: { name: "Accounts",     color: "--d-acct" },
+  card: { name: "Cards",        color: "--d-card" },
+  pay:  { name: "Payments",     color: "--d-pay" },
+  loan: { name: "Lending",      color: "--d-loan" },
+};
+
+const ENTITIES = [
+  { id: "branch", name: "Branch", table: "branch", pk: "branch_id", domain: "org",
+    desc: "A physical branch of the bank. Larger branches act as hubs for smaller ones in the same city.",
+    fks: [["manager_employee_id", "employee", "manages", "1:1", true],
+          ["parent_branch_id", "branch", "is the hub for", "1:N", true]],
+    attrs: [["branch_code", "VARCHAR(10)"], ["branch_name", "VARCHAR(80)"], ["city", "VARCHAR(40)"], ["province", "VARCHAR(30)"],
+            ["address", "VARCHAR(200)"], ["phone", "VARCHAR(20)"], ["opened_on", "DATE"], ["is_islamic", "BOOLEAN"],
+            ["has_lockers", "BOOLEAN"], ["status", "VARCHAR(12)"]],
+    samples: ["Gulberg Main, Lahore", "Clifton Block 5, Karachi", "Blue Area, Islamabad", "Saddar, Rawalpindi", "University Road, Peshawar",
+              "Jinnah Road, Quetta", "Kohinoor City, Faisalabad", "Cantt, Multan", "DHA Phase 6, Karachi", "Model Town, Lahore"] },
+
+  { id: "employee", name: "Employee", table: "employee", pk: "employee_id", domain: "org",
+    desc: "A member of staff, posted to a branch (or head office), with a designation and a line manager.",
+    fks: [["branch_id", "branch", "employs", "1:N", true],
+          ["designation_id", "designation", "is held by", "1:N", false],
+          ["manager_id", "employee", "line-manages", "1:N", true]],
+    attrs: [["employee_no", "VARCHAR(12)"], ["first_name", "VARCHAR(50)"], ["last_name", "VARCHAR(50)"], ["cnic", "CHAR(15)"],
+            ["gender", "CHAR(1)"], ["email", "VARCHAR(120)"], ["mobile", "VARCHAR(15)"], ["hire_date", "DATE"],
+            ["monthly_salary", "DECIMAL(12,2)"], ["status", "VARCHAR(12)"]],
+    samples: ["Ahmed Raza · Branch Manager", "Sana Iqbal · Cash Officer", "Bilal Hussain · Relationship Manager", "Mahnoor Tariq · Customer Service",
+              "Usman Sheikh · Operations Manager", "Hira Javed · Loan Officer", "Faisal Qureshi · Credit Analyst", "Zainab Ali · Compliance Officer",
+              "Kamran Butt · Fraud & Risk Analyst", "Ayesha Siddiqui · IT Support"] },
+
+  { id: "designation", name: "Designation", table: "designation", pk: "designation_id", domain: "org",
+    desc: "A job title with its pay band and approval authority. It sets which staff can approve loans or authorise transactions.",
+    fks: [],
+    attrs: [["title", "VARCHAR(60)"], ["grade", "VARCHAR(10)"], ["department", "VARCHAR(40)"], ["min_salary", "DECIMAL(12,2)"],
+            ["max_salary", "DECIMAL(12,2)"], ["approval_limit_pkr", "DECIMAL(14,2)"], ["can_approve_loans", "BOOLEAN"],
+            ["can_authorise_txn", "BOOLEAN"], ["description", "VARCHAR(200)"], ["status", "VARCHAR(12)"]],
+    samples: ["Branch Manager", "Operations Manager", "Relationship Manager", "Cash Officer (Teller)", "Customer Service Officer",
+              "Loan Officer", "Credit Analyst", "Compliance Officer", "Fraud & Risk Analyst", "IT Support Officer"] },
+
+  { id: "segment", name: "CustomerSegment", table: "customer_segment", pk: "segment_id", domain: "cust",
+    desc: "The customer group a person or business belongs to. It decides eligibility, fees and service level.",
+    fks: [],
+    attrs: [["segment_code", "VARCHAR(10)"], ["segment_name", "VARCHAR(40)"], ["min_age", "SMALLINT"], ["max_age", "SMALLINT"],
+            ["min_monthly_income", "DECIMAL(12,2)"], ["min_relationship_balance", "DECIMAL(14,2)"], ["priority_service", "BOOLEAN"],
+            ["fee_waiver_pct", "DECIMAL(5,2)"], ["description", "VARCHAR(200)"], ["status", "VARCHAR(12)"]],
+    samples: ["Mass Retail", "Priority Banking", "Premier", "Corporate", "SME", "Student", "Teens Club (13–17)", "Kids Club (under 13)",
+              "Senior Citizen", "Roshan Digital (overseas Pakistanis)"] },
+
+  { id: "customer", name: "Customer", table: "customer", pk: "customer_id", domain: "cust",
+    desc: "A person or business that banks with us, identified by CIF number and CNIC.",
+    fks: [["segment_id", "segment", "classifies", "1:N", false],
+          ["home_branch_id", "branch", "is home branch of", "1:N", false],
+          ["relationship_manager_id", "employee", "is relationship manager for", "1:N", true],
+          ["referred_by_customer_id", "customer", "referred", "1:N", true],
+          ["onboarded_by_employee_id", "employee", "onboarded", "1:N", false]],
+    attrs: [["cif_number", "VARCHAR(12)"], ["full_name", "VARCHAR(120)"], ["cnic", "CHAR(15)"], ["date_of_birth", "DATE"],
+            ["gender", "CHAR(1)"], ["mobile", "VARCHAR(15)"], ["email", "VARCHAR(120)"], ["address", "VARCHAR(200)"],
+            ["kyc_status", "VARCHAR(12)"], ["risk_rating", "VARCHAR(8)"]],
+    samples: ["Ayesha Khan · Priority", "Muhammad Ali · Mass Retail", "Fatima Noor · Teens Club", "Hamza Malik · Kids Club",
+              "Rizwan Ahmed · SME", "Nadia Hussain · Roshan Digital", "Tariq Mehmood · Senior Citizen", "Sara Farooq · Student",
+              "Imran Textiles (Pvt) Ltd · Corporate", "Zara Shah · Premier"] },
+
+  { id: "kyc", name: "KYCDocument", table: "kyc_document", pk: "document_id", domain: "cust",
+    desc: "An identity or income document collected for know-your-customer checks and verified against NADRA.",
+    fks: [["customer_id", "customer", "submits", "1:N", false],
+          ["verified_by_employee_id", "employee", "verifies", "1:N", true]],
+    attrs: [["document_type", "VARCHAR(30)"], ["document_number", "VARCHAR(30)"], ["issuing_authority", "VARCHAR(60)"],
+            ["issue_date", "DATE"], ["expiry_date", "DATE"], ["file_reference", "VARCHAR(200)"], ["verification_status", "VARCHAR(12)"],
+            ["verified_at", "TIMESTAMP"], ["biometric_verified", "BOOLEAN"], ["remarks", "VARCHAR(200)"]],
+    samples: ["CNIC", "Smart CNIC (SNIC)", "NICOP", "Passport", "B-Form (minors)", "Salary slip", "Utility bill",
+              "NTN certificate", "SECP registration", "Student ID card"] },
+
+  { id: "currency", name: "Currency", table: "currency", pk: "currency_id", domain: "acct",
+    desc: "A currency the bank holds accounts in, with today's buying and selling rates against the rupee.",
+    fks: [],
+    attrs: [["iso_code", "CHAR(3)"], ["currency_name", "VARCHAR(40)"], ["symbol", "VARCHAR(5)"], ["country", "VARCHAR(40)"],
+            ["decimal_places", "SMALLINT"], ["buy_rate_pkr", "DECIMAL(12,4)"], ["sell_rate_pkr", "DECIMAL(12,4)"],
+            ["is_base_currency", "BOOLEAN"], ["rate_updated_at", "TIMESTAMP"], ["status", "VARCHAR(12)"]],
+    samples: ["PKR · Pakistani Rupee", "USD · US Dollar", "EUR · Euro", "GBP · Pound Sterling", "AED · UAE Dirham",
+              "SAR · Saudi Riyal", "CNY · Chinese Yuan", "JPY · Japanese Yen", "CAD · Canadian Dollar", "AUD · Australian Dollar"] },
+
+  { id: "accttype", name: "AccountType", table: "account_type", pk: "account_type_id", domain: "acct",
+    desc: "A deposit product the bank sells, with its limits, profit rate and fees. Some products target one segment.",
+    fks: [["segment_id", "segment", "is offered", "1:N", true],
+          ["currency_id", "currency", "is the currency of", "1:N", false]],
+    attrs: [["product_code", "VARCHAR(10)"], ["product_name", "VARCHAR(60)"], ["category", "VARCHAR(20)"], ["is_islamic", "BOOLEAN"],
+            ["min_opening_deposit", "DECIMAL(12,2)"], ["min_balance", "DECIMAL(12,2)"], ["max_balance_limit", "DECIMAL(14,2)"],
+            ["profit_rate_pct", "DECIMAL(5,2)"], ["monthly_service_fee", "DECIMAL(8,2)"], ["cheque_book_allowed", "BOOLEAN"]],
+    samples: ["Asaan Account", "Asaan Digital Account", "Current Account", "Savings Account (PLS)", "Kids Club Account",
+              "Teens Club Account", "Senior Citizen Savings", "Roshan Digital Account", "Foreign Currency Account", "Term Deposit (1 year)"] },
+
+  { id: "account", name: "Account", table: "account", pk: "account_id", domain: "acct",
+    desc: "A customer's account: its IBAN, balances and status. The optional Raast alias lets people pay it by mobile number.",
+    fks: [["customer_id", "customer", "owns", "1:N", false],
+          ["account_type_id", "accttype", "defines", "1:N", false],
+          ["branch_id", "branch", "maintains", "1:N", false],
+          ["currency_id", "currency", "denominates", "1:N", false],
+          ["opened_by_employee_id", "employee", "opened", "1:N", true]],
+    attrs: [["account_number", "VARCHAR(16)"], ["iban", "CHAR(24)"], ["account_title", "VARCHAR(120)"], ["opened_on", "DATE"],
+            ["closed_on", "DATE"], ["ledger_balance", "DECIMAL(16,2)"], ["available_balance", "DECIMAL(16,2)"], ["raast_alias", "VARCHAR(15)"],
+            ["is_dormant", "BOOLEAN"], ["status", "VARCHAR(12)"]],
+    samples: ["PK36NBMS0000001012345678 · Current", "PK61NBMS0000001020456321 · Asaan", "PK02NBMS0000002031118804 · Savings (PLS)",
+              "PK88NBMS0000002045009912 · Kids Club", "PK47NBMS0000003050771230 · Teens Club", "PK19NBMS0000004060012457 · Roshan Digital",
+              "PK73NBMS0000004071990034 · USD foreign currency", "PK25NBMS0000005080123311 · Term Deposit", "PK90NBMS0000006091200045 · Senior Citizen",
+              "PK54NBMS0000007100340012 · Asaan Digital"] },
+
+  { id: "holder", name: "AccountHolder", table: "account_holder", pk: "holder_id", domain: "acct",
+    desc: "Links extra people to an account: joint holders, nominees, guardians of minors and authorised signatories.",
+    fks: [["account_id", "account", "has", "1:N", false],
+          ["customer_id", "customer", "is named on", "1:N", false],
+          ["added_by_employee_id", "employee", "added", "1:N", true]],
+    attrs: [["holder_role", "VARCHAR(30)"], ["ownership_pct", "DECIMAL(5,2)"], ["signing_authority", "VARCHAR(30)"], ["is_primary", "BOOLEAN"],
+            ["relationship_to_owner", "VARCHAR(30)"], ["added_on", "DATE"], ["removed_on", "DATE"], ["mandate_reference", "VARCHAR(30)"],
+            ["notify_by_sms", "BOOLEAN"], ["status", "VARCHAR(12)"]],
+    samples: ["Primary holder", "Joint holder", "Either or survivor", "Nominee", "Guardian (Kids Club)", "Authorised signatory",
+              "Mandate holder", "Power of attorney", "Beneficial owner", "Business partner"] },
+
+  { id: "cardtype", name: "CardType", table: "card_type", pk: "card_type_id", domain: "card",
+    desc: "The basic kind of card, such as debit or credit, and what it physically supports.",
+    fks: [],
+    attrs: [["type_code", "VARCHAR(10)"], ["type_name", "VARCHAR(40)"], ["is_credit", "BOOLEAN"], ["is_physical", "BOOLEAN"],
+            ["is_reloadable", "BOOLEAN"], ["default_validity_years", "SMALLINT"], ["chip_enabled", "BOOLEAN"], ["contactless_enabled", "BOOLEAN"],
+            ["description", "VARCHAR(200)"], ["status", "VARCHAR(12)"]],
+    samples: ["Debit card", "Credit card", "Prepaid card", "Virtual card", "Corporate card", "Forex / travel card", "ATM-only card",
+              "Islamic (Shariah) card", "Gift card", "Wearable (contactless band)"] },
+
+  { id: "cardproduct", name: "CardProduct", table: "card_product", pk: "card_product_id", domain: "card",
+    desc: "A member card the bank issues: a card type on a network, with fees and limits, often tied to an account product or segment.",
+    fks: [["card_type_id", "cardtype", "is the type of", "1:N", false],
+          ["account_type_id", "accttype", "is linked to", "1:N", true],
+          ["currency_id", "currency", "is the billing currency of", "1:N", false],
+          ["segment_id", "segment", "is eligible for", "1:N", true]],
+    attrs: [["product_name", "VARCHAR(60)"], ["network", "VARCHAR(20)"], ["tier", "VARCHAR(20)"], ["annual_fee", "DECIMAL(10,2)"],
+            ["issuance_fee", "DECIMAL(10,2)"], ["daily_atm_limit", "DECIMAL(12,2)"], ["daily_pos_limit", "DECIMAL(12,2)"],
+            ["default_credit_limit", "DECIMAL(12,2)"], ["reward_rate_pct", "DECIMAL(5,2)"], ["status", "VARCHAR(12)"]],
+    samples: ["Teens Club debit card", "Kids Club card", "Asaan Account debit card (PayPak)", "Raast-linked PayPak card", "World Mastercard (credit)",
+              "Platinum Visa (credit)", "Gold credit card", "Classic debit card", "Titanium debit card", "Virtual prepaid card"] },
+
+  { id: "card", name: "Card", table: "card", pk: "card_id", domain: "card",
+    desc: "A card issued to a cardholder on one of their accounts. Only the masked number is stored.",
+    fks: [["account_id", "account", "is charged by", "1:N", false],
+          ["card_product_id", "cardproduct", "is issued as", "1:N", false],
+          ["customer_id", "customer", "carries", "1:N", false],
+          ["issuing_branch_id", "branch", "issues", "1:N", false]],
+    attrs: [["masked_pan", "CHAR(19)"], ["name_on_card", "VARCHAR(26)"], ["issued_on", "DATE"], ["expiry_date", "DATE"],
+            ["credit_limit", "DECIMAL(12,2)"], ["outstanding_balance", "DECIMAL(12,2)"], ["pin_status", "VARCHAR(12)"],
+            ["contactless_enabled", "BOOLEAN"], ["ecommerce_enabled", "BOOLEAN"], ["status", "VARCHAR(12)"]],
+    samples: ["Platinum Visa •••• 0193 · active", "World Mastercard •••• 7741 · active", "PayPak •••• 2210 · active",
+              "Teens Club •••• 5508 · active", "Kids Club •••• 3906 · PIN not set", "Gold credit •••• 6612 · blocked",
+              "Classic debit •••• 1180 · expired", "Titanium debit •••• 9034 · hot-listed", "Virtual prepaid •••• 4471 · active",
+              "Raast PayPak •••• 8825 · active"] },
+
+  { id: "channel", name: "Channel", table: "channel", pk: "channel_id", domain: "pay",
+    desc: "Where a transaction comes from, and that channel's limits, fees and whether it needs a one-time password.",
+    fks: [],
+    attrs: [["channel_code", "VARCHAR(10)"], ["channel_name", "VARCHAR(40)"], ["operator", "VARCHAR(40)"], ["is_digital", "BOOLEAN"],
+            ["available_24x7", "BOOLEAN"], ["per_txn_limit", "DECIMAL(12,2)"], ["daily_limit", "DECIMAL(14,2)"], ["requires_otp", "BOOLEAN"],
+            ["fee_per_txn", "DECIMAL(8,2)"], ["status", "VARCHAR(12)"]],
+    samples: ["Branch counter", "ATM", "Mobile app", "Internet banking", "POS terminal", "Raast (SBP instant payments)",
+              "IBFT via 1LINK", "Call centre (IVR)", "Branchless / agent banking", "E-commerce gateway"] },
+
+  { id: "txntype", name: "TransactionType", table: "transaction_type", pk: "txn_type_id", domain: "pay",
+    desc: "What a transaction does: whether it debits or credits, and the charges and tax that apply to it.",
+    fks: [],
+    attrs: [["type_code", "VARCHAR(10)"], ["type_name", "VARCHAR(40)"], ["direction", "VARCHAR(6)"], ["is_reversible", "BOOLEAN"],
+            ["requires_authorisation", "BOOLEAN"], ["service_charge", "DECIMAL(8,2)"], ["withholding_tax_pct", "DECIMAL(5,2)"],
+            ["fed_pct", "DECIMAL(5,2)"], ["daily_limit", "DECIMAL(14,2)"], ["status", "VARCHAR(12)"]],
+    samples: ["Cash deposit", "Cash withdrawal", "Raast transfer", "IBFT transfer", "Utility bill payment", "POS purchase",
+              "Online purchase", "Cheque clearing", "Profit credit", "Loan instalment"] },
+
+  { id: "merchant", name: "Merchant", table: "merchant", pk: "merchant_id", domain: "pay",
+    desc: "A business that takes card or Raast QR payments through the bank, with the account its sales settle into.",
+    fks: [["settlement_account_id", "account", "receives settlement from", "1:N", false],
+          ["acquiring_branch_id", "branch", "acquires", "1:N", false]],
+    attrs: [["merchant_code", "VARCHAR(15)"], ["merchant_name", "VARCHAR(80)"], ["mcc", "CHAR(4)"], ["category", "VARCHAR(30)"],
+            ["city", "VARCHAR(40)"], ["terminal_count", "SMALLINT"], ["accepts_raast_qr", "BOOLEAN"], ["mdr_pct", "DECIMAL(5,2)"],
+            ["onboarded_on", "DATE"], ["status", "VARCHAR(12)"]],
+    samples: ["Imtiaz Supermarket", "Daraz.pk", "K-Electric", "PSO fuel station", "Gourmet Bakers", "Chase Up", "Careem",
+              "Sapphire", "Shaukat Khanum Hospital", "Cafe Aylanto"] },
+
+  { id: "beneficiary", name: "Beneficiary", table: "beneficiary", pk: "beneficiary_id", domain: "pay",
+    desc: "A saved payee. It can be paid by Raast ID, IBAN through 1LINK, or directly when the payee also banks with us.",
+    fks: [["customer_id", "customer", "saves", "1:N", false],
+          ["beneficiary_account_id", "account", "is the in-house account of", "1:N", true]],
+    attrs: [["nickname", "VARCHAR(40)"], ["beneficiary_name", "VARCHAR(120)"], ["bank_name", "VARCHAR(60)"], ["iban", "CHAR(24)"],
+            ["raast_id", "VARCHAR(15)"], ["beneficiary_type", "VARCHAR(15)"], ["mobile", "VARCHAR(15)"], ["added_on", "DATE"],
+            ["cooling_off_until", "TIMESTAMP"], ["status", "VARCHAR(12)"]],
+    samples: ["Ammi · Raast 0300-1234567", "Landlord · IBFT · HBL", "Brother Ali · in-house", "Sister Hina · Raast", "University fee · IBFT",
+              "Driver salary · Raast", "Office petty cash · in-house", "Committee (savings group) · IBFT", "Electrician · Raast", "Zakat fund · IBFT"] },
+
+  { id: "txn", name: "Transaction", table: "bank_transaction", pk: "transaction_id", domain: "pay",
+    desc: "One posting to an account. It records what happened, through which channel, and who or what was on the other side.",
+    fks: [["account_id", "account", "is posted to by", "1:N", false],
+          ["txn_type_id", "txntype", "categorises", "1:N", false],
+          ["channel_id", "channel", "carries", "1:N", false],
+          ["currency_id", "currency", "is the currency of", "1:N", false],
+          ["card_id", "card", "is used for", "1:N", true],
+          ["merchant_id", "merchant", "is paid by", "1:N", true],
+          ["beneficiary_id", "beneficiary", "receives", "1:N", true],
+          ["counterparty_account_id", "account", "is the counterparty in", "1:N", true],
+          ["loan_id", "loan", "is repaid by", "1:N", true],
+          ["processed_by_employee_id", "employee", "processes", "1:N", true]],
+    attrs: [["reference_no", "VARCHAR(20)"], ["rrn", "CHAR(12)"], ["amount", "DECIMAL(16,2)"], ["fee_amount", "DECIMAL(10,2)"],
+            ["tax_amount", "DECIMAL(10,2)"], ["balance_after", "DECIMAL(16,2)"], ["txn_datetime", "TIMESTAMP"], ["value_date", "DATE"],
+            ["narration", "VARCHAR(140)"], ["status", "VARCHAR(12)"]],
+    samples: ["Cash deposit · Rs 50,000 · branch", "Raast to Ammi · Rs 12,500 · app", "POS at Imtiaz · Rs 8,430 · card",
+              "K-Electric bill · Rs 6,210 · web", "ATM withdrawal · Rs 20,000", "IBFT to landlord · Rs 75,000 · 1LINK",
+              "Daraz order · Rs 3,999 · online", "Profit credit · Rs 1,842", "Car finance instalment · Rs 41,300", "Cheque clearing · Rs 150,000"] },
+
+  { id: "loanproduct", name: "LoanProduct", table: "loan_product", pk: "loan_product_id", domain: "loan",
+    desc: "A financing product with its amount and tenure limits and its pricing over KIBOR.",
+    fks: [],
+    attrs: [["product_code", "VARCHAR(10)"], ["product_name", "VARCHAR(60)"], ["category", "VARCHAR(20)"], ["is_islamic", "BOOLEAN"],
+            ["min_amount", "DECIMAL(14,2)"], ["max_amount", "DECIMAL(14,2)"], ["max_tenure_months", "SMALLINT"], ["rate_type", "VARCHAR(12)"],
+            ["spread_over_kibor_pct", "DECIMAL(5,2)"], ["processing_fee_pct", "DECIMAL(5,2)"]],
+    samples: ["Personal finance", "Car finance", "House finance", "Ijarah car finance (Islamic)", "SME running finance", "Agriculture finance",
+              "Gold-backed finance", "Mera Pakistan Mera Ghar", "Student finance", "Solar panel finance"] },
+
+  { id: "loan", name: "Loan", table: "loan", pk: "loan_id", domain: "loan",
+    desc: "A loan booked for a customer: who handled and approved it, where it was paid out, and how far repayment has got.",
+    fks: [["customer_id", "customer", "borrows", "1:N", false],
+          ["loan_product_id", "loanproduct", "is booked as", "1:N", false],
+          ["branch_id", "branch", "books", "1:N", false],
+          ["loan_officer_id", "employee", "handles", "1:N", false],
+          ["approved_by_employee_id", "employee", "approves", "1:N", true],
+          ["disbursement_account_id", "account", "receives the payout of", "1:N", false]],
+    attrs: [["loan_number", "VARCHAR(15)"], ["principal_amount", "DECIMAL(14,2)"], ["interest_rate_pct", "DECIMAL(5,2)"],
+            ["tenure_months", "SMALLINT"], ["emi_amount", "DECIMAL(12,2)"], ["disbursed_on", "DATE"], ["maturity_date", "DATE"],
+            ["outstanding_principal", "DECIMAL(14,2)"], ["days_past_due", "SMALLINT"], ["status", "VARCHAR(12)"]],
+    samples: ["LN-25-0001 · car · Rs 3.5m · 60 months", "LN-25-0002 · house · Rs 12m · 240 months", "LN-25-0003 · personal · Rs 800k",
+              "LN-25-0004 · SME · Rs 5m · running", "LN-25-0005 · agri · Rs 1.2m", "LN-25-0006 · gold · Rs 450k", "LN-25-0007 · MPMG · Rs 2.7m",
+              "LN-25-0008 · student · Rs 600k", "LN-25-0009 · solar · Rs 950k", "LN-24-0418 · car · 30+ days past due"] },
+];
+
+const byId = Object.fromEntries(ENTITIES.map((e) => [e.id, e]));
+const RELS = ENTITIES.flatMap((child) => child.fks.map(([col, parentId, phrase, card, nullable]) => ({
+  child, parent: byId[parentId], col, phrase, card, nullable,
+})));
+const relOf = (childId, col) => RELS.find((r) => r.child.id === childId && r.col === col);
+
+// ---------------------------------------------------------------------------------------------
+// Guided stories: real banking journeys, told one step at a time across the diagram.
+// Each step lists the foreign keys it uses as [child entity, column].
+// ---------------------------------------------------------------------------------------------
+const STORIES = [
+  { title: "Open an Asaan Account", who: "Muhammad Ali, a delivery rider in Lahore", steps: [
+    { text: "Muhammad walks into the Gulberg branch. A customer service officer creates his customer record (CIF) in the Mass Retail segment and makes Gulberg his home branch.",
+      rels: [["customer", "segment_id"], ["customer", "home_branch_id"], ["customer", "onboarded_by_employee_id"]] },
+    { text: "He hands over his CNIC. It is stored as a KYC document, and an officer verifies it biometrically against NADRA.",
+      rels: [["kyc", "customer_id"], ["kyc", "verified_by_employee_id"]] },
+    { text: "The officer picks the Asaan Account product: no minimum balance, a cap on the balance, and rupees only.",
+      rels: [["accttype", "segment_id"], ["accttype", "currency_id"]] },
+    { text: "The account is opened. One Account row ties together the customer, the product, the branch, the currency and the employee who opened it.",
+      rels: [["account", "customer_id"], ["account", "account_type_id"], ["account", "branch_id"], ["account", "currency_id"], ["account", "opened_by_employee_id"]] },
+    { text: "He names his wife as nominee. She gets a customer record too, linked to the account through AccountHolder.",
+      rels: [["holder", "account_id"], ["holder", "customer_id"]] },
+  ] },
+  { title: "A Teens Club card for Fatima", who: "Fatima Noor, 15, and her father", steps: [
+    { text: "Fatima is a customer in the Teens Club segment, which sets the age range and the fee waivers she gets.",
+      rels: [["customer", "segment_id"]] },
+    { text: "She opens a Teens Club account. Her father is attached as guardian through AccountHolder, so he can operate it too.",
+      rels: [["account", "customer_id"], ["account", "account_type_id"], ["holder", "account_id"], ["holder", "customer_id"]] },
+    { text: "The Teens Club debit card is a card product: a debit card type, offered only to the Teens Club segment and tied to the Teens Club account type.",
+      rels: [["cardproduct", "card_type_id"], ["cardproduct", "segment_id"], ["cardproduct", "account_type_id"]] },
+    { text: "Her card is issued at the branch with her name on it and charged to her account. Its low daily ATM and shopping limits come from the product.",
+      rels: [["card", "account_id"], ["card", "card_product_id"], ["card", "customer_id"], ["card", "issuing_branch_id"]] },
+  ] },
+  { title: "Send Rs 12,500 to Ammi with Raast", who: "Ayesha Khan, on the mobile app", steps: [
+    { text: "Ayesha has saved her mother as a beneficiary using her Raast ID, which is just her mobile number. New beneficiaries have a cooling-off period before large transfers.",
+      rels: [["beneficiary", "customer_id"]] },
+    { text: "She sends Rs 12,500. One Transaction row debits her account, in rupees.",
+      rels: [["txn", "account_id"], ["txn", "currency_id"]] },
+    { text: "The transaction records how it happened: the Raast channel and the Raast transfer type, which sets the fee and withholding tax.",
+      rels: [["txn", "channel_id"], ["txn", "txn_type_id"]] },
+    { text: "It also records who received the money. If Ammi banked with us too, her account would be stored as the counterparty.",
+      rels: [["txn", "beneficiary_id"], ["beneficiary", "beneficiary_account_id"], ["txn", "counterparty_account_id"]] },
+  ] },
+  { title: "Pay at Imtiaz with a Platinum card", who: "Zara Shah, at the checkout", steps: [
+    { text: "Zara's Platinum Visa is a card product of the credit card type.",
+      rels: [["card", "card_product_id"], ["cardproduct", "card_type_id"]] },
+    { text: "She taps it at the POS terminal. The purchase is posted as a transaction on the card's account, through the POS channel.",
+      rels: [["txn", "card_id"], ["txn", "account_id"], ["txn", "channel_id"], ["txn", "txn_type_id"]] },
+    { text: "The merchant is Imtiaz Supermarket. Its card sales settle into its own account, through the branch that signed it up.",
+      rels: [["txn", "merchant_id"], ["merchant", "settlement_account_id"], ["merchant", "acquiring_branch_id"]] },
+  ] },
+  { title: "Car finance, from approval to instalment", who: "Rizwan Ahmed, buying a family car", steps: [
+    { text: "Rizwan applies for Car Finance, a loan product priced at KIBOR plus a spread.",
+      rels: [["loan", "customer_id"], ["loan", "loan_product_id"]] },
+    { text: "A loan officer at his branch handles the case. A manager approves it, within the approval limit set by their designation.",
+      rels: [["loan", "branch_id"], ["loan", "loan_officer_id"], ["loan", "approved_by_employee_id"], ["employee", "designation_id"]] },
+    { text: "The money is paid out into his current account.",
+      rels: [["loan", "disbursement_account_id"]] },
+    { text: "Each month an instalment is posted as a transaction that points back to the loan, so the bank can track repayments and days past due.",
+      rels: [["txn", "loan_id"], ["txn", "account_id"], ["txn", "txn_type_id"]] },
+  ] },
+];
+STORIES.forEach((s) => s.steps.forEach((st) => {
+  st.relObjs = st.rels.map(([c, col]) => relOf(c, col));
+  if (st.relObjs.some((r) => !r)) console.error("Story refers to a missing foreign key", s.title, st.rels);
+  st.ids = new Set(st.relObjs.flatMap((r) => [r.child.id, r.parent.id]));
+}));
+
+// ---------------------------------------------------------------------------------------------
+// Small helpers
+// ---------------------------------------------------------------------------------------------
+const $ = (s) => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v);
+  }
+  kids.flat().forEach((k) => k != null && n.append(k));
+  return n;
+};
+const SVGNS = "http://www.w3.org/2000/svg";
+const sv = (tag, attrs = {}) => {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  return n;
+};
+const domainVar = (e) => `var(${DOMAINS[e.domain].color})`;
+const plural = (n) => /y$/.test(n) ? n.slice(0, -1) + "ies" : /(s|ch|sh|x)$/.test(n) ? n + "es" : n + "s";
+
+// Plain-English readings of a foreign key, from either end.
+const parentSentence = (r) => r.card === "1:1"
+  ? `One ${r.parent.name} ${r.phrase} at most one ${r.child.name}.`
+  : `One ${r.parent.name} ${r.phrase} many ${plural(r.child.name)}.`;
+const childSentence = (r) => r.nullable
+  ? `A ${r.child.name} can be linked to one ${r.parent.name}, but doesn't have to be.`
+  : `Every ${r.child.name} belongs to exactly one ${r.parent.name}.`;
+
+// ---------------------------------------------------------------------------------------------
+// Stats (counted from the model, not typed in)
+// ---------------------------------------------------------------------------------------------
+const attrCount = ENTITIES.reduce((n, e) => n + e.attrs.length, 0);
+const sampleCount = ENTITIES.reduce((n, e) => n + e.samples.length, 0);
+[[ENTITIES.length, "entities"], [ENTITIES.length, "primary keys"], [RELS.length, "foreign keys"],
+ [attrCount, "attributes"], [sampleCount, "example values"]].forEach(([n, label]) =>
+  $("#stats").append(el("div", { class: "stat" }, el("b", { text: n }), el("span", { text: label }))));
+
+// ---------------------------------------------------------------------------------------------
+// Layout: one column per subject area. Three detail levels change the box heights.
+// ---------------------------------------------------------------------------------------------
+const W = 300, HEAD = 30, ROW = 18, PAD = 8, COLGAP = 120;
+const COLUMNS = [
+  ["designation", "employee", "branch"],
+  ["segment", "customer", "kyc"],
+  ["currency", "accttype", "account", "holder"],
+  ["cardtype", "cardproduct", "card", "beneficiary"],
+  ["channel", "txntype", "txn"],
+  ["merchant", "loanproduct", "loan"],
+];
+const MODES = { names: "Tables", keys: "Keys", all: "All columns" };
+let mode = "all";
+const rowsOf = (e) => {
+  const pk = { name: e.pk, type: "BIGINT", key: "PK" };
+  const fks = e.fks.map(([col]) => ({ name: col, type: "BIGINT", key: "FK" }));
+  if (mode === "names") return [];
+  if (mode === "keys") return [pk, ...fks];
+  return [pk, ...fks, ...e.attrs.map(([name, type]) => ({ name, type, key: "" }))];
+};
+let pos = {}, WORLD = { w: 0, h: 0 };
+function layout() {
+  pos = {};
+  const gap = mode === "names" ? 90 : mode === "keys" ? 60 : 44;
+  COLUMNS.forEach((col, ci) => {
+    let y = 20;
+    col.forEach((id) => {
+      const e = byId[id];
+      const n = mode === "names" ? 2 : rowsOf(e).length;
+      const h = HEAD + n * ROW + PAD;
+      pos[id] = { x: 20 + ci * (W + COLGAP), y, h, col: ci };
+      y += h + gap;
+    });
+  });
+  WORLD = {
+    w: 20 + COLUMNS.length * (W + COLGAP) - COLGAP + 60,
+    h: Math.max(...Object.values(pos).map((p) => p.y + p.h)) + 30,
+  };
+}
+const rowY = (id, i) => pos[id].y + HEAD + i * ROW + ROW / 2 + 2;
+function fkAnchorY(e, col) {
+  const i = e.fks.findIndex((f) => f[0] === col), p = pos[e.id];
+  if (mode === "names") {
+    const top = p.y + HEAD + 4, bottom = p.y + p.h - 4;
+    return top + (i + 1) * (bottom - top) / (e.fks.length + 1);
+  }
+  return rowY(e.id, 1 + i);
+}
+const pkAnchorY = (e) => mode === "names" ? pos[e.id].y + HEAD / 2 : rowY(e.id, 0);
+
+// ---------------------------------------------------------------------------------------------
+// Drawing
+// ---------------------------------------------------------------------------------------------
+const svg = $("#erd");
+const world = sv("g");
+const edgeLayer = sv("g");
+const boxLayer = sv("g");
+world.append(edgeLayer, boxLayer);
+svg.append(world);
+let boxEls = {}, relEls = [], rowEls = {};
+
+function drawBox(e) {
+  const p = pos[e.id];
+  const g = sv("g", { class: "box", tabindex: "0", role: "button", "aria-label": `${e.name} table` });
+  g.dataset.id = e.id;
+  g.append(sv("rect", { class: "body", x: p.x, y: p.y, width: W, height: p.h, rx: 7 }));
+  const head = sv("rect", { class: "head", x: p.x, y: p.y, width: W, height: HEAD, rx: 7 });
+  const headFix = sv("rect", { class: "head", x: p.x, y: p.y + HEAD - 8, width: W, height: 8 });
+  head.style.fill = headFix.style.fill = domainVar(e);
+  const title = sv("text", { class: "title", x: p.x + 12, y: p.y + 20 });
+  title.textContent = e.name;
+  g.append(head, headFix, title);
+  if (mode === "names") {
+    const a = sv("text", { class: "summary", x: p.x + 12, y: p.y + HEAD + 17 });
+    a.textContent = `Key: ${e.pk}`;
+    const b = sv("text", { class: "summary", x: p.x + 12, y: p.y + HEAD + 35 });
+    b.textContent = `${e.fks.length} links out · ${RELS.filter((r) => r.parent === e).length} links in · ${e.attrs.length} columns`;
+    g.append(a, b);
+  }
+  rowsOf(e).forEach((r, i) => {
+    const bg = sv("rect", { class: "rowbg", x: p.x + 1, y: p.y + HEAD + i * ROW + 2, width: W - 2, height: ROW });
+    rowEls[`${e.id}.${r.name}`] = bg;
+    g.append(bg);
+    const y = rowY(e.id, i) + 4;
+    if (r.key) {
+      const k = sv("text", { class: r.key === "PK" ? "key-pk" : "key-fk", x: p.x + 10, y });
+      k.textContent = r.key;
+      g.append(k);
+    }
+    const n = sv("text", { x: p.x + 34, y });
+    n.textContent = r.name;
+    const t = sv("text", { class: "type", x: p.x + W - 10, y, "text-anchor": "end" });
+    t.textContent = r.type;
+    g.append(n, t);
+    if (i === e.fks.length && mode === "all") {
+      const ly = p.y + HEAD + i * ROW + 2;
+      g.append(sv("line", { class: "sep", x1: p.x, x2: p.x + W, y1: ly, y2: ly }));
+    }
+  });
+  g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(e.id); } });
+  g.addEventListener("pointerenter", (ev) => { if (!selected && !drag && ev.pointerType === "mouse" && !activeFocus()) focusEntity(e.id); });
+  g.addEventListener("pointerleave", () => { if (!selected && !(drag && drag.moved) && !activeFocus()) focusDomain(domainOn); });
+  boxLayer.append(g);
+  boxEls[e.id] = g;
+}
+
+function drawRel(r, loops) {
+  const c = pos[r.child.id], p = pos[r.parent.id];
+  const y1 = fkAnchorY(r.child, r.col), y2 = pkAnchorY(r.parent);
+  let d, x1, x2, s1, s2; // s = direction pointing away from the box (+1 right, -1 left)
+  if (c.col === p.col) {
+    loops[c.col] = (loops[c.col] || 0) + 1;
+    const bulge = 28 + loops[c.col] * 14;
+    x1 = c.x + W; x2 = p.x + W; s1 = 1; s2 = 1;
+    d = `M${x1} ${y1} C${x1 + bulge} ${y1}, ${x2 + bulge} ${y2}, ${x2} ${y2}`;
+  } else {
+    const right = p.x > c.x;
+    x1 = right ? c.x + W : c.x; s1 = right ? 1 : -1;
+    x2 = right ? p.x : p.x + W; s2 = right ? -1 : 1;
+    const k = Math.max(50, Math.abs(x2 - x1) * 0.45);
+    d = `M${x1} ${y1} C${x1 + s1 * k} ${y1}, ${x2 + s2 * k} ${y2}, ${x2} ${y2}`;
+  }
+  const g = sv("g", { class: "rel" });
+  g.append(sv("path", { class: "edge", d }));
+  if (r.card === "1:1") {
+    g.append(sv("path", { class: "edge-mark", d: `M${x1 + s1 * 10} ${y1 - 6}V${y1 + 6}` }));
+  } else {
+    g.append(sv("path", { class: "edge-mark", d: `M${x1 + s1 * 13} ${y1}L${x1} ${y1 - 6}M${x1 + s1 * 13} ${y1}L${x1} ${y1 + 6}M${x1 + s1 * 13} ${y1}H${x1}` }));
+  }
+  g.append(sv("path", { class: "edge-mark", d: `M${x2 + s2 * 9} ${y2 - 6}V${y2 + 6}` }));
+  if (r.nullable) g.append(sv("circle", { class: "edge-mark dot", cx: x2 + s2 * 19, cy: y2, r: 4 }));
+  const t = sv("title");
+  t.textContent = `${parentSentence(r)} ${childSentence(r)} (${r.child.name}.${r.col} → ${r.parent.name}.${r.parent.pk})`;
+  g.append(t);
+  edgeLayer.append(g);
+  relEls.push({ g, r });
+}
+
+function draw() {
+  layout();
+  edgeLayer.replaceChildren();
+  boxLayer.replaceChildren();
+  boxEls = {}; relEls = []; rowEls = {};
+  ENTITIES.forEach(drawBox);
+  const loops = {};
+  RELS.forEach((r) => drawRel(r, loops));
+  drawMinimap();
+  refresh();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pan & zoom
+// ---------------------------------------------------------------------------------------------
+const view = { s: 1, x: 0, y: 0 };
+const canvas = $("#canvas");
+const apply = () => { world.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${view.s})`); updateMini(); };
+function fit() {
+  const r = canvas.getBoundingClientRect();
+  view.s = Math.min(r.width / WORLD.w, r.height / WORLD.h);
+  view.x = (r.width - WORLD.w * view.s) / 2;
+  view.y = (r.height - WORLD.h * view.s) / 2;
+  apply();
+}
+function fitTo(ids, maxScale = 1.1) {
+  const r = canvas.getBoundingClientRect();
+  const ps = [...ids].map((id) => pos[id]);
+  const x0 = Math.min(...ps.map((p) => p.x)) - 40, y0 = Math.min(...ps.map((p) => p.y)) - 40;
+  const x1 = Math.max(...ps.map((p) => p.x + W)) + 80, y1 = Math.max(...ps.map((p) => p.y + p.h)) + 40;
+  view.s = Math.min(maxScale, r.width / (x1 - x0), r.height / (y1 - y0));
+  view.x = (r.width - (x1 - x0) * view.s) / 2 - x0 * view.s;
+  view.y = (r.height - (y1 - y0) * view.s) / 2 - y0 * view.s;
+  apply();
+}
+function zoomAt(factor, cx, cy) {
+  const s = Math.min(3, Math.max(0.12, view.s * factor));
+  view.x = cx - (cx - view.x) * (s / view.s);
+  view.y = cy - (cy - view.y) * (s / view.s);
+  view.s = s;
+  apply();
+}
+function centreOn(id) {
+  const r = canvas.getBoundingClientRect(), p = pos[id];
+  view.s = Math.max(view.s, Math.min(1, r.height / (p.h + 120), r.width / (W + 120)));
+  view.x = r.width / 2 - (p.x + W / 2) * view.s;
+  view.y = r.height / 2 - (p.y + p.h / 2) * view.s;
+  apply();
+}
+// Zoom buttons zoom towards the selected table, or the middle of the view.
+function zoomTarget() {
+  const r = canvas.getBoundingClientRect();
+  if (selected) {
+    const p = pos[selected];
+    return [view.x + (p.x + W / 2) * view.s, view.y + (p.y + p.h / 2) * view.s];
+  }
+  return [r.width / 2, r.height / 2];
+}
+$("#zin").onclick = () => zoomAt(1.3, ...zoomTarget());
+$("#zout").onclick = () => zoomAt(1 / 1.3, ...zoomTarget());
+$("#fit").onclick = fit;
+
+// Ctrl + wheel (and trackpad pinch, which arrives as ctrl + wheel) zooms. A plain wheel or
+// trackpad swipe pans once zoomed in past the fit size, and otherwise scrolls the page.
+canvas.addEventListener("wheel", (ev) => {
+  if (ev.target.closest("#mini")) return;
+  const r = canvas.getBoundingClientRect();
+  if (ev.ctrlKey || ev.metaKey) {
+    ev.preventDefault();
+    zoomAt(Math.exp(-ev.deltaY * 0.0025), ev.clientX - r.left, ev.clientY - r.top);
+    return;
+  }
+  const fitScale = Math.min(r.width / WORLD.w, r.height / WORLD.h);
+  if (view.s <= fitScale * 1.01) return;
+  ev.preventDefault();
+  view.x -= ev.shiftKey ? ev.deltaY : ev.deltaX;
+  view.y -= ev.shiftKey ? 0 : ev.deltaY;
+  apply();
+}, { passive: false });
+
+// Drag anywhere (on a table too) to pan; two fingers pinch to zoom. A press that doesn't move
+// is a click: on a table it selects it, on the background it clears the selection.
+const pointers = new Map();
+let drag = null, pinch = null;
+canvas.addEventListener("pointerdown", (ev) => {
+  if (ev.target.closest("#mini")) return;
+  if (ev.button !== 0 && ev.pointerType === "mouse") return;
+  pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  canvas.setPointerCapture(ev.pointerId);
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) };
+    drag = null;
+    return;
+  }
+  const box = ev.target.closest(".box");
+  drag = { x: ev.clientX, y: ev.clientY, vx: view.x, vy: view.y, moved: false, box: box && box.dataset.id };
+});
+canvas.addEventListener("pointermove", (ev) => {
+  if (!pointers.has(ev.pointerId)) return;
+  pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (pinch && pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    const r = canvas.getBoundingClientRect();
+    zoomAt(d / pinch.d, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
+    pinch.d = d;
+    return;
+  }
+  if (!drag) return;
+  const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+  if (!drag.moved && Math.abs(dx) + Math.abs(dy) > 4) {
+    drag.moved = true;
+    canvas.classList.add("dragging");
+  }
+  if (drag.moved) { view.x = drag.vx + dx; view.y = drag.vy + dy; apply(); }
+});
+const endPointer = (ev, cancelled) => {
+  pointers.delete(ev.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (drag && !drag.moved && !cancelled) {
+    if (drag.box) select(drag.box === selected && tab === "details" ? null : drag.box);
+    else if (tab === "details") select(null);
+  }
+  if (pointers.size === 0) { drag = null; canvas.classList.remove("dragging"); }
+};
+canvas.addEventListener("pointerup", (ev) => endPointer(ev, false));
+canvas.addEventListener("pointercancel", (ev) => endPointer(ev, true));
+
+// Arrow keys pan, + and - zoom, 0 fits, when the diagram has keyboard focus.
+canvas.tabIndex = 0;
+canvas.addEventListener("keydown", (ev) => {
+  if (ev.target !== canvas) return;
+  const step = 60;
+  const moves = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] };
+  if (moves[ev.key]) { ev.preventDefault(); view.x += moves[ev.key][0]; view.y += moves[ev.key][1]; apply(); }
+  else if (ev.key === "+" || ev.key === "=") zoomAt(1.3, ...zoomTarget());
+  else if (ev.key === "-") zoomAt(1 / 1.3, ...zoomTarget());
+  else if (ev.key === "0") fit();
+});
+
+// ---------------------------------------------------------------------------------------------
+// Minimap: the whole diagram in miniature, with the visible area outlined. Click or drag on it
+// to move there.
+// ---------------------------------------------------------------------------------------------
+const mini = $("#mini");
+let vpRect = null;
+function drawMinimap() {
+  mini.setAttribute("viewBox", `0 0 ${WORLD.w} ${WORLD.h}`);
+  mini.style.aspectRatio = `${WORLD.w} / ${WORLD.h}`;
+  mini.replaceChildren();
+  ENTITIES.forEach((e) => {
+    const p = pos[e.id];
+    const r = sv("rect", { x: p.x, y: p.y, width: W, height: p.h, rx: 14 });
+    r.style.fill = domainVar(e);
+    r.style.opacity = ".55";
+    mini.append(r);
+  });
+  vpRect = sv("rect", { class: "vp" });
+  mini.append(vpRect);
+  updateMini();
+}
+function updateMini() {
+  if (!vpRect) return;
+  const r = canvas.getBoundingClientRect();
+  vpRect.setAttribute("x", -view.x / view.s);
+  vpRect.setAttribute("y", -view.y / view.s);
+  vpRect.setAttribute("width", r.width / view.s);
+  vpRect.setAttribute("height", r.height / view.s);
+}
+function miniJump(ev) {
+  const mr = mini.getBoundingClientRect(), r = canvas.getBoundingClientRect();
+  const wx = (ev.clientX - mr.left) / mr.width * WORLD.w;
+  const wy = (ev.clientY - mr.top) / mr.height * WORLD.h;
+  view.x = r.width / 2 - wx * view.s;
+  view.y = r.height / 2 - wy * view.s;
+  apply();
+}
+let miniDrag = false;
+mini.addEventListener("pointerdown", (ev) => { miniDrag = true; mini.setPointerCapture(ev.pointerId); miniJump(ev); ev.stopPropagation(); });
+mini.addEventListener("pointermove", (ev) => { if (miniDrag) miniJump(ev); });
+mini.addEventListener("pointerup", () => { miniDrag = false; });
+
+// ---------------------------------------------------------------------------------------------
+// Focus and highlighting. Each tab owns what is highlighted: Details shows the selected table
+// (or a subject area), Connect shows the path, Stories shows the current step.
+// ---------------------------------------------------------------------------------------------
+let selected = null, domainOn = null, pathFocus = null, storyFocus = null, tab = "details";
+const activeFocus = () => (tab === "connect" && pathFocus) || (tab === "stories" && storyFocus) || null;
+function highlight(ids, relFilter) {
+  svg.classList.toggle("focus", !!ids);
+  Object.entries(boxEls).forEach(([id, g]) => g.classList.toggle("dim", !!ids && !ids.has(id)));
+  relEls.forEach(({ g, r }) => {
+    const on = !!ids && relFilter(r);
+    g.classList.toggle("hot", on);
+    g.classList.toggle("dim", !!ids && !on);
+  });
+}
+function focusEntity(id) {
+  if (!id) return highlight(null);
+  const ids = new Set([id]);
+  RELS.forEach((r) => { if (r.child.id === id) ids.add(r.parent.id); if (r.parent.id === id) ids.add(r.child.id); });
+  highlight(ids, (r) => r.child.id === id || r.parent.id === id);
+}
+function focusDomain(dom) {
+  if (!dom) return highlight(null);
+  const ids = new Set(ENTITIES.filter((e) => e.domain === dom).map((e) => e.id));
+  highlight(ids, (r) => ids.has(r.child.id) && ids.has(r.parent.id));
+}
+function refresh() {
+  const f = activeFocus();
+  if (f) highlight(f.ids, (r) => f.rels.has(r));
+  else if (selected && tab === "details") focusEntity(selected);
+  else focusDomain(tab === "details" ? domainOn : null);
+  Object.entries(boxEls).forEach(([id, g]) => g.classList.toggle("sel", tab === "details" && id === selected));
+  document.querySelectorAll("#domains .chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.dom === domainOn)));
+}
+function select(id, { centre = false, hitValue = null } = {}) {
+  selected = id;
+  if (id) domainOn = null;
+  setTab("details");
+  renderDetails(id, hitValue);
+  if (id && centre) centreOn(id);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Tabs
+// ---------------------------------------------------------------------------------------------
+function setTab(t) {
+  tab = t;
+  ["details", "connect", "stories"].forEach((name) => {
+    $(`#tab-${name}`).setAttribute("aria-selected", String(name === t));
+    $(`#pane-${name}`).hidden = name !== t;
+  });
+  refresh();
+}
+["details", "connect", "stories"].forEach((name) => {
+  $(`#tab-${name}`).addEventListener("click", () => {
+    setTab(name);
+    if (name === "connect") runConnect();
+    if (name === "stories" && storyFocus) fitTo(storyFocus.ids);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Detail level
+// ---------------------------------------------------------------------------------------------
+function setMode(m, { refit = true } = {}) {
+  mode = m;
+  document.querySelectorAll("#modes button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.mode === m)));
+  draw();
+  if (!refit) return;
+  const f = activeFocus();
+  if (f) fitTo(f.ids); else if (selected) centreOn(selected); else fit();
+}
+Object.entries(MODES).forEach(([key, label]) => {
+  const b = el("button", { type: "button", role: "radio", "aria-checked": String(key === mode), text: label });
+  b.dataset.mode = key;
+  b.onclick = () => setMode(key);
+  $("#modes").append(b);
+});
+
+// Subject-area chips
+Object.entries(DOMAINS).forEach(([key, d]) => {
+  const n = ENTITIES.filter((e) => e.domain === key).length;
+  const chip = el("button", { class: "chip", type: "button", "aria-pressed": "false" },
+    el("i", { style: `background: var(${d.color})` }), `${d.name} · ${n}`);
+  chip.dataset.dom = key;
+  chip.onclick = () => {
+    domainOn = domainOn === key ? null : key;
+    selected = null;
+    setTab("details");
+    renderDetails(null);
+    if (domainOn) fitTo(ENTITIES.filter((e) => e.domain === key).map((e) => e.id));
+  };
+  $("#domains").append(chip);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Details pane
+// ---------------------------------------------------------------------------------------------
+const entLink = (e) => {
+  const b = el("button", { class: "ent-link", type: "button", text: e.name });
+  b.onclick = () => select(e.id, { centre: true });
+  return b;
+};
+function attrTable(e) {
+  const t = el("table", { class: "attrs" });
+  const row = (badge, name, type) => {
+    const td = el("td");
+    if (badge) td.append(el("span", { class: `badge ${badge.toLowerCase()}`, text: badge }));
+    td.append(name);
+    t.append(el("tr", {}, td, el("td", { text: type })));
+  };
+  row("PK", e.pk, "BIGINT");
+  e.fks.forEach(([col]) => row("FK", col, "BIGINT"));
+  e.attrs.forEach(([n, ty]) => row("", n, ty));
+  return t;
+}
+function detail(e, linked, hitValue) {
+  const outgoing = RELS.filter((r) => r.child === e);
+  const incoming = RELS.filter((r) => r.parent === e);
+  const sentenceList = (rels, write) => el("ul", { class: "sentences" }, rels.map((r) => el("li", {}, ...write(r))));
+  const name = (x) => linked ? entLink(x) : x.name;
+  const keys = el("div", { class: "kv" }, el("span", { class: "kv-title", text: `It points to (${outgoing.length})` }));
+  if (outgoing.length) {
+    keys.append(sentenceList(outgoing, (r) => [
+      r.nullable ? `A ${e.name} can be linked to one ` : `Every ${e.name} belongs to exactly one `,
+      name(r.parent), r.nullable ? ", but doesn't have to be " : " ", el("code", { text: `(${r.col})` })]));
+  } else keys.append(el("span", { class: "opt", text: "Nothing. This is a lookup table that other tables point to." }));
+  const refd = el("div", { class: "kv" }, el("span", { class: "kv-title", text: `Points here (${incoming.length})` }));
+  if (incoming.length) {
+    refd.append(sentenceList(incoming, (r) => [
+      `One ${e.name} ${r.phrase} ${r.card === "1:1" ? "at most one" : "many"} `,
+      linked ? entLink(r.child) : (r.card === "1:1" ? r.child.name : plural(r.child.name)),
+      " ", el("code", { text: `(${r.child.table}.${r.col})` })]));
+  } else refd.append(el("span", { class: "opt", text: "No other table points here." }));
+  return [
+    el("p", { class: "desc", text: e.desc }),
+    keys, refd,
+    el("div", { class: "kv" }, el("span", { class: "kv-title", text: "Columns" }), attrTable(e)),
+    el("div", { class: "kv" }, el("span", { class: "kv-title", text: "10 example values" }),
+      el("div", { class: "samples" }, e.samples.map((s) => el("span", { class: s === hitValue ? "hit" : "", text: s })))),
+  ];
+}
+function renderDetails(id, hitValue = null) {
+  const pane = $("#pane-details");
+  pane.replaceChildren();
+  if (!id) {
+    const start = (title, text, action) => {
+      const b = el("button", { class: "start", type: "button" }, el("b", { text: title }), el("span", { text }));
+      b.onclick = action;
+      return b;
+    };
+    pane.append(el("div", { class: "empty" },
+      el("h3", { text: domainOn ? DOMAINS[domainOn].name : "Explore the bank's data" }),
+      el("p", { text: domainOn
+        ? "This subject area is highlighted. Click one of its tables to see its keys, columns and links."
+        : "Click any table to see what it stores and how it links to the rest, in plain English." }),
+      el("div", { class: "starts" },
+        start("Take a guided story", "Follow a customer opening an Asaan Account, step by step.", () => { setTab("stories"); startStory(0); }),
+        start("Connect two tables", "Pick any two tables and get the path between them and a ready SQL join.", () => { setTab("connect"); runConnect(); }),
+        start("Search for “Raast”", "Find every table, column and value that mentions it.", () => { $("#q").value = "Raast"; $("#q").focus(); runSearch(); }),
+        start("Show only table names", "A calmer overview of how the 20 tables fit together.", () => setMode("names")))));
+    return;
+  }
+  const e = byId[id];
+  const tag = el("span", { class: "dom-tag", text: DOMAINS[e.domain].name });
+  tag.style.color = domainVar(e);
+  pane.append(tag, el("h3", { text: e.name }), el("code", { text: e.table }), ...detail(e, true, hitValue));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Search: tables, columns and example values in one box.
+// ---------------------------------------------------------------------------------------------
+const INDEX = ENTITIES.flatMap((e) => [
+  { kind: "Table", e, label: e.name, sub: e.desc, hay: `${e.name} ${e.table}` },
+  { kind: "Column", e, col: e.pk, label: `${e.name}.${e.pk}`, sub: "Primary key", hay: e.pk },
+  ...e.fks.map(([col, parent]) => ({ kind: "Column", e, col, label: `${e.name}.${col}`, sub: `Links to ${byId[parent].name}`, hay: col })),
+  ...e.attrs.map(([col, type]) => ({ kind: "Column", e, col, label: `${e.name}.${col}`, sub: type, hay: col })),
+  ...e.samples.map((s) => ({ kind: "Value", e, value: s, label: s, sub: `Example in ${e.name}`, hay: s })),
+]);
+const qInput = $("#q"), qList = $("#qres");
+let results = [], active = -1;
+const norm = (s) => s.toLowerCase().replace(/[_\s]+/g, " ");
+function markMatch(text, q) {
+  const i = norm(text).indexOf(norm(q));
+  if (i < 0 || !q) return [text];
+  return [text.slice(0, i), el("mark", { text: text.slice(i, i + q.length) }), text.slice(i + q.length)];
+}
+function runSearch() {
+  const q = qInput.value.trim();
+  if (!q) { closeSearch(); return; }
+  const nq = norm(q);
+  const order = { Table: 0, Column: 1, Value: 2 };
+  results = INDEX.filter((it) => norm(it.hay).includes(nq) || (it.kind === "Table" && norm(it.sub).includes(nq)))
+    .sort((a, b) => order[a.kind] - order[b.kind] || (norm(a.hay).startsWith(nq) ? -1 : 0) - (norm(b.hay).startsWith(nq) ? -1 : 0))
+    .slice(0, 14);
+  active = results.length ? 0 : -1;
+  qList.replaceChildren();
+  if (!results.length) qList.append(el("li", { class: "none", text: `Nothing matches “${q}”.` }));
+  results.forEach((it, i) => {
+    const li = el("li", { role: "option", id: `qr-${i}`, "aria-selected": String(i === active) },
+      el("span", { class: "kind", text: it.kind }), el("span", { class: "lab" }, ...markMatch(it.label, q)),
+      el("span", { class: "sub", text: it.sub }));
+    li.addEventListener("pointerdown", (ev) => { ev.preventDefault(); choose(i); });
+    qList.append(li);
+  });
+  qList.hidden = false;
+  qInput.setAttribute("aria-expanded", "true");
+  qInput.setAttribute("aria-activedescendant", active >= 0 ? `qr-${active}` : "");
+}
+function moveActive(d) {
+  if (!results.length) return;
+  active = (active + d + results.length) % results.length;
+  qList.querySelectorAll("li[role=option]").forEach((li, i) => li.setAttribute("aria-selected", String(i === active)));
+  qList.querySelector(`#qr-${active}`).scrollIntoView({ block: "nearest" });
+  qInput.setAttribute("aria-activedescendant", `qr-${active}`);
+}
+function closeSearch() {
+  qList.hidden = true;
+  qInput.setAttribute("aria-expanded", "false");
+}
+function choose(i) {
+  const it = results[i];
+  if (!it) return;
+  closeSearch();
+  if (it.col) {
+    const isAttr = it.e.attrs.some(([n]) => n === it.col);
+    if (isAttr && mode !== "all") setMode("all", { refit: false });
+    else if (!isAttr && mode === "names") setMode("keys", { refit: false });
+  }
+  select(it.e.id, { centre: true, hitValue: it.value || null });
+  if (it.col) {
+    const row = rowEls[`${it.e.id}.${it.col}`];
+    if (row) { row.classList.remove("flash"); void row.getBBox(); row.classList.add("flash"); }
+  }
+}
+qInput.addEventListener("input", runSearch);
+qInput.addEventListener("focus", () => { if (qInput.value.trim()) runSearch(); });
+qInput.addEventListener("blur", () => setTimeout(closeSearch, 120));
+qInput.addEventListener("keydown", (ev) => {
+  if (ev.key === "ArrowDown") { ev.preventDefault(); moveActive(1); }
+  else if (ev.key === "ArrowUp") { ev.preventDefault(); moveActive(-1); }
+  else if (ev.key === "Enter") { ev.preventDefault(); choose(active); }
+  else if (ev.key === "Escape") { closeSearch(); }
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "/" && document.activeElement !== qInput && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) {
+    ev.preventDefault(); qInput.focus();
+  }
+});
+
+// ---------------------------------------------------------------------------------------------
+// Connect two tables: shortest path over the foreign keys, explained and turned into SQL.
+// ---------------------------------------------------------------------------------------------
+function findPath(a, b) {
+  if (a === b) return { ids: [a], steps: [] };
+  const prev = { [a]: null }, queue = [a];
+  while (queue.length) {
+    const cur = queue.shift();
+    for (const r of RELS) {
+      const next = r.child.id === cur ? r.parent.id : r.parent.id === cur ? r.child.id : null;
+      if (!next || next in prev) continue;
+      prev[next] = { from: cur, rel: r };
+      queue.push(next);
+    }
+    if (b in prev) break;
+  }
+  if (!(b in prev)) return null;
+  const steps = [];
+  for (let cur = b; prev[cur]; cur = prev[cur].from) steps.unshift({ from: prev[cur].from, to: cur, rel: prev[cur].rel });
+  return { ids: [a, ...steps.map((s) => s.to)], steps };
+}
+function joinSql(path) {
+  const used = new Set(), alias = {};
+  path.ids.forEach((id) => {
+    const t = byId[id].table;
+    let a = t.split("_").map((w) => w[0]).join("");
+    if (a.length < 2) a = t.slice(0, 2);
+    let x = a, n = 2;
+    while (used.has(x)) x = a + n++;
+    used.add(x); alias[id] = x;
+  });
+  const cols = path.ids.flatMap((id) => byId[id].attrs.slice(0, 2).map(([c]) => `${alias[id]}.${c}`));
+  const lines = [`SELECT ${cols.join(",\n       ")}`, `FROM ${byId[path.ids[0]].table} ${alias[path.ids[0]]}`];
+  path.steps.forEach(({ from, to, rel }) => {
+    const join = rel.nullable ? "LEFT JOIN" : "JOIN";
+    const t = byId[to];
+    const on = rel.child.id === from
+      ? `${alias[to]}.${t.pk} = ${alias[from]}.${rel.col}`
+      : `${alias[to]}.${rel.col} = ${alias[from]}.${byId[from].pk}`;
+    lines.push(`${join} ${t.table} ${alias[to]} ON ${on}`);
+  });
+  lines.push("LIMIT 50;");
+  return lines.join("\n");
+}
+const pickFrom = el("select", { id: "from" }), pickTo = el("select", { id: "to" });
+ENTITIES.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach((e) => {
+  pickFrom.append(el("option", { value: e.id, text: e.name }));
+  pickTo.append(el("option", { value: e.id, text: e.name }));
+});
+pickFrom.value = "card"; pickTo.value = "loan";
+const swap = el("button", { class: "btn", type: "button", "aria-label": "Swap the two tables", text: "⇄" });
+swap.onclick = () => { [pickFrom.value, pickTo.value] = [pickTo.value, pickFrom.value]; runConnect(); };
+pickFrom.onchange = pickTo.onchange = () => runConnect();
+const connectOut = el("div", { class: "pane-out", style: "display:grid;gap:16px" });
+$("#pane-connect").append(
+  el("p", { class: "opt", text: "Pick two tables. You'll see the shortest chain of foreign keys between them, what each link means, and the SQL to join them." }),
+  el("div", { class: "pickers" },
+    el("label", {}, "From", pickFrom), swap, el("label", {}, "To", pickTo)),
+  connectOut);
+function runConnect() {
+  const path = findPath(pickFrom.value, pickTo.value);
+  connectOut.replaceChildren();
+  if (!path || !path.steps.length) {
+    pathFocus = null;
+    connectOut.append(el("p", { class: "opt", text: "Choose two different tables." }));
+    refresh();
+    return;
+  }
+  pathFocus = { ids: new Set(path.ids), rels: new Set(path.steps.map((s) => s.rel)) };
+  const chain = el("div", { class: "chain" });
+  path.ids.forEach((id, i) => {
+    if (i) chain.append(el("span", { class: "arrow", text: "→" }));
+    const n = el("span", { class: "node", text: byId[id].name });
+    n.style.background = domainVar(byId[id]);
+    chain.append(n);
+  });
+  const hops = path.steps.length;
+  const steps = el("ol", { class: "steps" }, path.steps.map(({ from, rel }) =>
+    el("li", { text: rel.child.id === from ? childSentence(rel) : parentSentence(rel) })));
+  const sql = joinSql(path);
+  const copy = el("button", { class: "btn", type: "button", text: "Copy SQL" });
+  const pre = el("pre", { class: "code", text: sql });
+  copy.onclick = () => copyText(pre, copy, "Copy SQL");
+  connectOut.append(
+    el("div", { class: "kv" }, el("span", { class: "kv-title", text: `${hops} link${hops > 1 ? "s" : ""}` }), chain),
+    el("div", { class: "kv" }, el("span", { class: "kv-title", text: "What each link means" }), steps),
+    el("div", { class: "kv" }, el("div", { class: "row" }, el("span", { class: "kv-title", text: "SQL" }), copy), pre));
+  refresh();
+  fitTo(path.ids);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Stories
+// ---------------------------------------------------------------------------------------------
+let story = null, stepIdx = 0;
+function renderStoryList() {
+  const pane = $("#pane-stories");
+  pane.replaceChildren(el("p", { class: "opt", text: "Real banking moments, told one step at a time. The diagram follows along and lights up the tables and links each step uses." }));
+  STORIES.forEach((s, i) => {
+    const b = el("button", { class: "story", type: "button" }, el("b", { text: s.title }),
+      el("span", { text: `${s.who} · ${s.steps.length} steps` }));
+    b.onclick = () => startStory(i);
+    pane.append(b);
+  });
+}
+function startStory(i) { story = STORIES[i]; stepIdx = 0; renderStep(); }
+function renderStep() {
+  const pane = $("#pane-stories");
+  const st = story.steps[stepIdx];
+  storyFocus = { ids: st.ids, rels: new Set(st.relObjs) };
+  const prog = el("div", { class: "progress", "aria-hidden": "true" }, story.steps.map((_, i) => el("i", { class: i <= stepIdx ? "on" : "" })));
+  const prev = el("button", { class: "btn", type: "button", text: "← Back" });
+  prev.disabled = stepIdx === 0;
+  prev.onclick = () => { stepIdx--; renderStep(); };
+  const last = stepIdx === story.steps.length - 1;
+  const next = el("button", { class: "btn primary", type: "button", text: last ? "Finish" : "Next →" });
+  next.onclick = () => { if (last) { storyFocus = null; story = null; renderStoryList(); refresh(); fit(); } else { stepIdx++; renderStep(); } };
+  const all = el("button", { class: "ent-link", type: "button", text: "All stories" });
+  all.onclick = () => { storyFocus = null; story = null; renderStoryList(); refresh(); fit(); };
+  const tables = el("div", { class: "chain" }, [...st.ids].map((id) => {
+    const n = el("span", { class: "node", text: byId[id].name });
+    n.style.background = domainVar(byId[id]);
+    return n;
+  }));
+  pane.replaceChildren(
+    el("div", { class: "row" }, el("span", { class: "kv-title", text: `Step ${stepIdx + 1} of ${story.steps.length}` }), all),
+    el("h3", { text: story.title }),
+    el("span", { class: "opt", text: story.who }),
+    prog,
+    el("p", { class: "narration", text: st.text }),
+    el("div", { class: "kv" }, el("span", { class: "kv-title", text: "Tables in this step" }), tables),
+    el("div", { class: "kv" }, el("span", { class: "kv-title", text: "Links used" }),
+      el("ul", { class: "sentences" }, st.relObjs.map((r) => el("li", { text: parentSentence(r) })))),
+    el("div", { class: "nav" }, prev, next));
+  refresh();
+  fitTo(st.ids);
+  next.focus({ preventScroll: true });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Reference sections
+// ---------------------------------------------------------------------------------------------
+ENTITIES.forEach((e) => {
+  const head = el("div", { class: "ent-head" }, el("h3", { text: e.name }), el("span", { text: DOMAINS[e.domain].name }));
+  head.style.background = domainVar(e);
+  $("#catalogue").append(el("article", { class: "ent", id: `ent-${e.id}` }, head, ...detail(e, false)));
+});
+
+(() => {
+  const t = $("#rels");
+  t.append(el("thead", {}, el("tr", {}, ["#", "Parent (PK)", "In plain English", "Child (FK)", "Cardinality", "Optional"].map((h) => el("th", { text: h })))));
+  const tb = el("tbody");
+  RELS.forEach((r, i) => tb.append(el("tr", {},
+    el("td", { class: "n", text: i + 1 }),
+    el("td", {}, el("b", { text: r.parent.name }), el("br"), el("code", { text: r.parent.pk })),
+    el("td", { text: `${parentSentence(r)} ${childSentence(r)}` }),
+    el("td", {}, el("b", { text: r.child.name }), el("br"), el("code", { text: r.col })),
+    el("td", { class: "card-pill", text: r.card === "1:1" ? "1 : 1" : "1 : N" }),
+    el("td", { class: "opt", text: r.nullable ? "Yes (NULL allowed)" : "No" }))));
+  t.append(tb);
+})();
+
+function copyText(pre, btn, label) {
+  const done = () => { btn.textContent = "Copied"; setTimeout(() => (btn.textContent = label), 1400); };
+  const fallback = () => {
+    const range = document.createRange(); range.selectNodeContents(pre);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(range);
+    btn.textContent = "Selected, press Ctrl+C";
+    setTimeout(() => (btn.textContent = label), 2400);
+  };
+  try { navigator.clipboard.writeText(pre.textContent).then(done, fallback); } catch { fallback(); }
+}
+
+(() => {
+  const sql = ["-- Banking Management System: 20 tables, 50 foreign keys (PostgreSQL).",
+               "-- Tables are created first and foreign keys added afterwards, because some",
+               "-- references are circular (a branch has a manager; an employee works at a branch).", ""];
+  ENTITIES.forEach((e) => {
+    const cols = [`  ${e.pk} BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY`];
+    e.fks.forEach(([col, , , card, nullable]) => cols.push(`  ${col} BIGINT${nullable ? "" : " NOT NULL"}${card === "1:1" ? " UNIQUE" : ""}`));
+    e.attrs.forEach(([n, ty]) => cols.push(`  ${n} ${ty}`));
+    sql.push(`CREATE TABLE ${e.table} (\n${cols.join(",\n")}\n);`, "");
+  });
+  RELS.forEach((r) => sql.push(
+    `ALTER TABLE ${r.child.table} ADD CONSTRAINT fk_${r.child.table}_${r.col}\n  FOREIGN KEY (${r.col}) REFERENCES ${r.parent.table} (${r.parent.pk});`));
+  $("#sql").textContent = sql.join("\n");
+
+  const mtype = (ty) => ty.toLowerCase().replace(/\(.*\)/, "");
+  const m = ["erDiagram"];
+  ENTITIES.forEach((e) => {
+    m.push(`  ${e.name} {`, `    bigint ${e.pk} PK`);
+    e.fks.forEach(([col]) => m.push(`    bigint ${col} FK`));
+    e.attrs.forEach(([n, ty]) => m.push(`    ${mtype(ty)} ${n}`));
+    m.push("  }");
+  });
+  RELS.forEach((r) => {
+    const parentEnd = r.nullable ? "|o" : "||";
+    const childEnd = r.card === "1:1" ? "o|" : "o{";
+    m.push(`  ${r.parent.name} ${parentEnd}--${childEnd} ${r.child.name} : "${r.phrase}"`);
+  });
+  $("#mmd").textContent = m.join("\n");
+
+  document.querySelectorAll("[data-copy]").forEach((b) =>
+    b.addEventListener("click", () => copyText(document.getElementById(b.dataset.copy), b, "Copy")));
+})();
+
+// ---------------------------------------------------------------------------------------------
+// Start
+// ---------------------------------------------------------------------------------------------
+renderStoryList();
+renderDetails(null);
+draw();
+if (location.hash === "#values") {
+  document.body.classList.add("values");
+  document.querySelector("#entities h2").textContent = "Ten example values for every entity";
+} else if (location.hash === "#poster") {
+  document.body.classList.add("poster");
+  svg.setAttribute("width", WORLD.w);
+  svg.setAttribute("height", WORLD.h);
+  svg.setAttribute("viewBox", `0 0 ${WORLD.w} ${WORLD.h}`);
+} else {
+  fit();
+  let lastW = canvas.clientWidth;
+  new ResizeObserver(() => {
+    if (Math.abs(canvas.clientWidth - lastW) > 40) {
+      lastW = canvas.clientWidth;
+      const f = activeFocus();
+      if (f) fitTo(f.ids); else fit();
+    }
+  }).observe(canvas);
+}
+window.ERD_SIZE = WORLD;
+</script>
