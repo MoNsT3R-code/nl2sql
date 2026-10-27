@@ -97,7 +97,7 @@ def serve(engine: NL2SQL, model: str, host: str = "127.0.0.1",
 
 
 def main() -> None:
-    from .__main__ import add_db_args, open_db
+    from .__main__ import add_db_args, make_engine
 
     parser = argparse.ArgumentParser(prog="nl2sql.web", description=__doc__)
     add_db_args(parser)
@@ -106,7 +106,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
 
-    engine = NL2SQL(open_db(args.db), model=args.model)
+    engine = make_engine(args)
     server = serve(engine, args.model, args.host, args.port)
     print(f"nl2sql web UI on http://{args.host}:{args.port}  (Ctrl+C to stop)")
     try:

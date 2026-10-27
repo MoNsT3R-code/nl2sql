@@ -46,6 +46,13 @@ def add_db_args(parser: argparse.ArgumentParser) -> None:
                         help="SQLite file or database URL, e.g. postgresql+psycopg://user@host/bank "
                              "(default: sample.db; sample.db and bank.db are created if missing)")
     parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--sample-rows", type=int, default=0, metavar="N",
+                        help="also send the AI N example rows per table (default 0: privacy mode, "
+                             "only the question and the table structure are sent)")
+
+
+def make_engine(args) -> NL2SQL:
+    return NL2SQL(open_db(args.db), model=args.model, sample_rows=args.sample_rows)
 
 
 def main() -> None:
@@ -54,7 +61,7 @@ def main() -> None:
     add_db_args(parser)
     args = parser.parse_args()
 
-    engine = NL2SQL(open_db(args.db), model=args.model)
+    engine = make_engine(args)
     if args.question:
         answer(engine, args.question)
         return

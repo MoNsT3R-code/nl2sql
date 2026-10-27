@@ -108,8 +108,11 @@ Without Docker, load the same two files with your database's own client, e.g.
 
 ## How it works
 
-1. **Schema** (`schema.py`): `CREATE TABLE` statements plus a couple of sample rows per table go into
-   the system prompt, which is prompt-cached across questions.
+1. **Schema, never data** (`schema.py`): the `CREATE TABLE` statements go into the system prompt, which
+   is prompt-cached across questions. That and the question are all the AI receives. It never sees
+   rows from your tables or the results of its queries; results are shown only on your side. If the
+   data isn't sensitive, `--sample-rows 2` (or `NL2SQL(..., sample_rows=2)`) also sends two example
+   rows per table, which can help accuracy. A test checks that no stored value reaches the AI by default.
 2. **Large schemas**: with more than 30 tables, each question gets only the relevant ones (up to 12),
    picked by word overlap with table and column names, plus the tables they join to through foreign
    keys. The rest are listed by name, so Claude can say when it needs a table it can't see.
@@ -143,7 +146,7 @@ Use `--file` and `--db` to run your own question set against your own database.
 pytest
 ```
 
-70 tests, using a fake Claude client, so no API key or network is needed. The database tests run on
+74 tests, using a fake Claude client, so no API key or network is needed. The database tests run on
 both the SQLite driver and SQLAlchemy.
 
 ## Not yet done

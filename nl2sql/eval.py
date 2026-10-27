@@ -156,7 +156,7 @@ def main() -> None:
         print(f"All {len(cases)} gold queries run.")
         return
 
-    engine = NL2SQL(db, model=args.model)
+    engine = NL2SQL(db, model=args.model, sample_rows=args.sample_rows)
     print(f"Running {len(cases)} cases with {args.model}...\n")
     results = run_eval(engine, cases, progress=lambda r: print(
         f"  {'PASS' if r.passed else 'FAIL'}  {r.id:<24} {'' if r.passed else r.reason}"))
