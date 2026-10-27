@@ -96,7 +96,10 @@ def main():
         ready, why = local.available()
         client = RehearsedClient(load_rehearsed(HERE / "demo_questions.json"), fallback=local if ready else None)
         label = f"{args.model} (local, offline)" if ready else "rehearsed questions only"
-        engine = NL2SQL(db, client=client, model=label)
+        # The security layer is on by default; the audit log records every question and decision.
+        audit = HERE.parent / "nl2sql-audit.jsonl"
+        engine = NL2SQL(db, client=client, model=label, audit_log=audit)
+        print(f"Security layer on. Audit log: {audit}")
         if ready:
             print(f"Local AI: {args.model}. Warming it up (the first time can take a minute)...")
             try:
