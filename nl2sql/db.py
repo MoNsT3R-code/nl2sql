@@ -4,6 +4,7 @@ SQLite files use the stdlib driver. Anything given as a URL (postgresql://, mysq
 sqlite:///...) goes through SQLAlchemy, which is an optional dependency.
 """
 
+import re
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -135,6 +136,15 @@ class SQLAlchemyDatabase(Database):
                     f"    FOREIGN KEY ({', '.join(fk['constrained_columns'])}) REFERENCES "
                     f"{fk['referred_table']}({', '.join(fk['referred_columns'])})"
                 )
+            # CHECK rules list the allowed values of status-like columns ('active', 'blocked', ...).
+            # They are part of the structure, not data, and the model needs them to spell values right.
+            try:
+                checks = insp.get_check_constraints(name)
+            except NotImplementedError:
+                checks = []
+            for ck in checks:
+                if allowed := _allowed_values(ck["sqltext"]):
+                    lines.append(f"    CHECK ({allowed})")
             ddl = f"CREATE TABLE {name} (\n" + ",\n".join(lines) + "\n)"
             refs = sorted({fk["referred_table"] for fk in fks})
             infos.append(TableInfo(name, ddl, [c["name"] for c in cols], refs))
@@ -154,6 +164,20 @@ class SQLAlchemyDatabase(Database):
 
     def close(self) -> None:
         self.engine.dispose()
+
+
+def _allowed_values(check_sql: str) -> str | None:
+    """Rewrite a CHECK that lists allowed values compactly: status IN ('active', 'blocked').
+
+    PostgreSQL reports `status IN (...)` as `(status)::text = ANY ((ARRAY['active'::character varying,
+    ...])::text[])`. Other CHECKs (ranges, formats) are left out to keep the prompt short."""
+    m = re.search(r"\(?(\w+)\)?(?:::[\w ]+)?\s*(?:=\s*ANY|IN)\s*\(+\s*(?:ARRAY\[)?(.*)", check_sql, re.IGNORECASE)
+    if not m:
+        return None
+    values = re.findall(r"'((?:[^']|'')*)'", m.group(2))
+    if not values:
+        return None
+    return f"{m.group(1)} IN ({', '.join(repr(v) for v in values)})"
 
 
 def open_database(target: str | Path) -> Database:
