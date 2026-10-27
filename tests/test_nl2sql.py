@@ -57,8 +57,47 @@ def test_schema_description(db):
     schema = describe_schema(db, db.tables(), other_tables=["audit_log"])
     for table in ("customers", "products", "orders", "order_items"):
         assert f"CREATE TABLE {table}" in schema
-    assert "sample rows from customers" in schema
+    assert "sample rows" not in schema  # structure only by default
     assert "audit_log" in schema
+    with_rows = describe_schema(db, db.tables(), sample_rows=2)
+    assert "sample rows from customers" in with_rows
+
+
+# --- privacy -------------------------------------------------------------------
+
+def _data_values(db):
+    """Every text value stored in the demo database (names, countries, product names, dates),
+    except allowed values that the table definitions themselves list, such as
+    CHECK (status IN ('placed', 'shipped', 'cancelled')). Those are structure, not data."""
+    ddl = " ".join(t.ddl for t in db.tables())
+    values = set()
+    for t in db.tables():
+        for row in db.run(f'SELECT * FROM "{t.name}"', max_rows=10_000).rows:
+            values.update(v for v in row if isinstance(v, str) and len(v) > 3 and f"'{v}'" not in ddl)
+    return values
+
+
+def test_privacy_mode_sends_no_data_by_default(db):
+    client = FakeClient(
+        SQLAnswer(answerable=True, sql="SELECT nme FROM customers", explanation="typo"),           # fails...
+        SQLAnswer(answerable=True, sql="SELECT name, country FROM customers", explanation=""),    # ...repaired
+        SQLAnswer(answerable=True, sql="SELECT COUNT(*) FROM orders", explanation=""),            # a later question
+    )
+    engine = NL2SQL(db, client=client)
+    first = engine.ask("List customers and their countries")
+    assert ("Ayesha Khan", "Pakistan") in first.result.rows  # the results exist locally...
+    engine.ask("How many orders?")
+
+    sent = repr(client.calls)  # ...but nothing from the database reached the model, in any request
+    leaked = sorted(v for v in _data_values(db) if v in sent)
+    assert leaked == []
+    assert "sample rows" not in sent
+
+
+def test_sample_rows_are_opt_in(db):
+    client = FakeClient(SQLAnswer(answerable=True, sql="SELECT 1", explanation=""))
+    NL2SQL(db, client=client, sample_rows=2).ask("?")
+    assert "sample rows from customers" in client.calls[0]["system"][0]["text"]
 
 
 def test_run_query_truncates(db):

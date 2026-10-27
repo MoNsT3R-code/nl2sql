@@ -1,8 +1,9 @@
 """Execution-accuracy eval: run each question through NL2SQL and compare results with a gold query.
 
     python -m nl2sql.eval                       # demo set against sample.db (calls the API)
+    python -m nl2sql.eval --set bank            # bank set against bank.db
     python -m nl2sql.eval --check-gold          # only check that the gold queries run (free)
-    python -m nl2sql.eval --file my_cases.jsonl --db postgresql://... --out results.json
+    python -m nl2sql.eval --file my_cases.jsonl --db postgresql+psycopg://... --out results.json
 
 Each line of the cases file: {"id", "question", "gold_sql" (null = should be unanswerable),
 "ordered" (optional, row order must match)}.
@@ -23,6 +24,9 @@ from .db import Database, QueryResult
 from .generator import NL2SQL, NL2SQLError
 
 DEMO_CASES = Path(__file__).parent / "data" / "demo_eval.jsonl"
+BANK_CASES = Path(__file__).parent / "data" / "bank_eval.jsonl"
+# Built-in question sets: name -> (cases file, default database)
+SETS = {"demo": (DEMO_CASES, "sample.db"), "bank": (BANK_CASES, "bank.db")}
 
 
 @dataclass
@@ -132,14 +136,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="nl2sql.eval", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     add_db_args(parser)
-    parser.add_argument("--file", default=str(DEMO_CASES), help="cases file (.jsonl)")
+    parser.set_defaults(db=None)  # default comes from --set
+    parser.add_argument("--set", choices=sorted(SETS), default="demo",
+                        help="built-in question set; picks the matching database unless --db is given")
+    parser.add_argument("--file", help="your own cases file (.jsonl), instead of --set")
     parser.add_argument("--out", help="write per-case results to this JSON file")
     parser.add_argument("--check-gold", action="store_true",
                         help="only check that gold queries run; makes no API calls")
     args = parser.parse_args()
 
-    db = open_db(args.db)
-    cases = load_cases(args.file)
+    set_file, set_db = SETS[args.set]
+    db = open_db(args.db or set_db)
+    cases = load_cases(args.file or set_file)
     problems = check_gold(db, cases)
     if problems:
         print("Gold queries that fail:\n  " + "\n  ".join(problems), file=sys.stderr)
@@ -148,7 +156,7 @@ def main() -> None:
         print(f"All {len(cases)} gold queries run.")
         return
 
-    engine = NL2SQL(db, model=args.model)
+    engine = NL2SQL(db, model=args.model, sample_rows=args.sample_rows)
     print(f"Running {len(cases)} cases with {args.model}...\n")
     results = run_eval(engine, cases, progress=lambda r: print(
         f"  {'PASS' if r.passed else 'FAIL'}  {r.id:<24} {'' if r.passed else r.reason}"))

@@ -46,9 +46,15 @@ class NL2SQLResult:
 
 class NL2SQL:
     def __init__(self, db: Database, client=None, model: str = DEFAULT_MODEL,
-                 max_attempts: int = 2, full_schema_limit: int = 30, max_tables: int = 12):
+                 max_attempts: int = 2, full_schema_limit: int = 30, max_tables: int = 12,
+                 sample_rows: int = 0):
         """Schemas with up to `full_schema_limit` tables go into the prompt whole (and cached).
-        Larger ones get a per-question selection of at most `max_tables` tables."""
+        Larger ones get a per-question selection of at most `max_tables` tables.
+
+        Privacy: by default the model receives only the question and the database structure
+        (table and column definitions), never rows from the database, and it never sees query
+        results. `sample_rows` > 0 opts in to sending that many example rows per table, which
+        can help accuracy on data that isn't sensitive."""
         if client is None:
             import anthropic
 
@@ -58,6 +64,7 @@ class NL2SQL:
         self.model = model
         self.max_attempts = max_attempts
         self.max_tables = max_tables
+        self.sample_rows = sample_rows
         self.tables = db.tables()
         self.large_schema = len(self.tables) > full_schema_limit
         self._full_system = None if self.large_schema else self._system(self.tables)
@@ -65,7 +72,7 @@ class NL2SQL:
     def _system(self, tables) -> str:
         names = {t.name for t in tables}
         others = [t.name for t in self.tables if t.name not in names]
-        schema = describe_schema(self.db, tables, other_tables=others)
+        schema = describe_schema(self.db, tables, sample_rows=self.sample_rows, other_tables=others)
         return SYSTEM_PROMPT.format(dialect=self.db.dialect, schema=schema)
 
     def _generate(self, system: str, messages: list) -> tuple[SQLAnswer, object]:

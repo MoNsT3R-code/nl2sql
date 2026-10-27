@@ -7,12 +7,12 @@ from .db import Database, TableInfo
 _WORD = re.compile(r"[a-z0-9]+")
 
 
-def describe_schema(db: Database, tables: list[TableInfo], sample_rows: int = 2,
+def describe_schema(db: Database, tables: list[TableInfo], sample_rows: int = 0,
                     other_tables: list[str] | None = None) -> str:
-    """CREATE statements plus a few sample rows for each table in `tables`.
+    """CREATE statements for each table in `tables`, plus `sample_rows` example rows per table.
 
-    `other_tables` are listed by name only, so the model knows they exist without
-    paying for their full definitions.
+    The default of 0 sends structure only, never table contents. `other_tables` are listed by
+    name only, so the model knows they exist without paying for their full definitions.
     """
     parts = []
     for t in tables:

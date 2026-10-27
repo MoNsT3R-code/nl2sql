@@ -73,7 +73,7 @@
   </header>
 
   <form id="ask">
-    <textarea id="question" placeholder="e.g. Which customers spent the most on shipped orders?" maxlength="2000" required></textarea>
+    <textarea id="question" placeholder="Ask a question about your data, in plain English" maxlength="2000" required></textarea>
     <div class="row">
       <span class="hint">Ctrl+Enter to ask · queries run read-only</span>
       <button class="primary" id="submit" type="submit">Ask</button>
@@ -93,20 +93,34 @@ const el = (tag, cls, text) => {
   return node;
 };
 
+// Example questions for the bundled databases, picked by which tables the server reports.
 const EXAMPLES = [
-  "How many orders are there in each status?",
-  "Which customer spent the most on shipped orders?",
-  "Which products did Omar Haddad order?",
-  "What is the average order value in dollars, excluding cancelled orders?",
+  {
+    tables: ["accounts", "transactions", "loans", "fraud_alerts"],
+    questions: [
+      "Who are the five customers with the highest combined balance?",
+      "How much did customers spend by card in each merchant category last month?",
+      "Which loans are in default, and who approved them?",
+      "How many fraud alerts were confirmed as fraud at each branch?",
+    ],
+  },
+  {
+    tables: ["customers", "orders", "order_items", "products"],
+    questions: [
+      "How many orders are there in each status?",
+      "Which customer spent the most on shipped orders?",
+      "Which products did Omar Haddad order?",
+      "What is the average order value in dollars, excluding cancelled orders?",
+    ],
+  },
 ];
 
 fetch("/api/info").then((r) => r.json()).then((info) => {
   $("#meta").textContent = `${info.dialect} · ${info.tables.length} tables · ${info.model}`;
   $("#meta").title = info.tables.join(", ");
-  // Example questions only make sense for the bundled demo database.
-  const demo = ["customers", "orders", "order_items", "products"].every((t) => info.tables.includes(t));
-  if (demo) {
-    for (const q of EXAMPLES) {
+  const set = EXAMPLES.find((s) => s.tables.every((t) => info.tables.includes(t)));
+  if (set) {
+    for (const q of set.questions) {
       const b = el("button", null, q);
       b.type = "button";
       b.onclick = () => { $("#question").value = q; ask(); };
@@ -114,6 +128,14 @@ fetch("/api/info").then((r) => r.json()).then((info) => {
     }
   }
 }).catch(() => { $("#meta").textContent = "Server not reachable"; });
+
+function formatCell(v) {
+  if (v === null) return "NULL";
+  // Strip binary floating-point noise (657951.1799999999 -> 657951.18) without rounding
+  // away real precision such as interest rates.
+  if (typeof v === "number" && !Number.isInteger(v)) return String(parseFloat(v.toPrecision(12)));
+  return String(v);
+}
 
 function renderTable(columns, rows) {
   const wrap = el("div", "table-wrap");
@@ -131,7 +153,7 @@ function renderTable(columns, rows) {
   }
   for (const row of rows) {
     const tr = el("tr");
-    row.forEach((v) => tr.append(el("td", typeof v === "number" ? "num" : null, v === null ? "NULL" : String(v))));
+    row.forEach((v) => tr.append(el("td", typeof v === "number" ? "num" : null, formatCell(v))));
     body.append(tr);
   }
   wrap.append(table);
