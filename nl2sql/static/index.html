@@ -62,6 +62,9 @@
   .note { font-size: 13px; margin-top: 10px; padding: 8px 10px; border-radius: 7px; background: var(--warn-bg); color: var(--warn); }
   .error { background: var(--error-bg); color: var(--error); }
   .muted { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  .q-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
+  .q-row .q { margin: 0; }
+  .source { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
   .pending { color: var(--muted); }
 </style>
 </head>
@@ -95,6 +98,15 @@ const el = (tag, cls, text) => {
 
 // Example questions for the bundled databases, picked by which tables the server reports.
 const EXAMPLES = [
+  {
+    tables: ["account", "bank_transaction", "loan", "card_product"],
+    questions: [
+      "Which Asaan accounts are dormant?",
+      "Which customers have an overdue loan?",
+      "How many Raast transfers were made and what was their total value?",
+      "How many active cards are there for each member card?",
+    ],
+  },
   {
     tables: ["accounts", "transactions", "loans", "fraud_alerts"],
     questions: [
@@ -160,8 +172,19 @@ function renderTable(columns, rows) {
   return wrap;
 }
 
+// Who wrote the SQL, shown on every answer so nobody mistakes a rehearsed answer for a live one.
+function sourceLabel(source) {
+  if (!source) return null;
+  if (source === "rehearsed") return "Instant · rehearsed";
+  if (source.startsWith("local:")) return "Local AI · " + source.slice(6);
+  return "Claude";
+}
+
 function renderResult(card, data) {
   card.querySelector(".pending")?.remove();
+  clearInterval(card.timer);
+  const label = sourceLabel(data.source);
+  if (label) card.querySelector(".q-row").append(el("span", "source", label));
   if (data.error) {
     card.append(el("div", "note error", data.error));
     return;
@@ -190,7 +213,15 @@ async function ask() {
   const question = $("#question").value.trim();
   if (!question) return;
   const card = el("article", "card");
-  card.append(el("p", "q", question), el("div", "pending", "Thinking…"));
+  const row = el("div", "q-row");
+  row.append(el("p", "q", question));
+  const pending = el("div", "pending", "Thinking…");
+  card.append(row, pending);
+  // A local model on a laptop can take a while; show that it's still working.
+  const started = Date.now();
+  card.timer = setInterval(() => {
+    pending.textContent = `Thinking… ${Math.round((Date.now() - started) / 1000)}s`;
+  }, 1000);
   $("#results").prepend(card);
   $("#submit").disabled = true;
   try {

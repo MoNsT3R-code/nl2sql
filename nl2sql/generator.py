@@ -42,6 +42,7 @@ class NL2SQLResult:
     attempts: int
     errors: list[str] = field(default_factory=list)
     tables: list[str] = field(default_factory=list)  # tables whose definitions were in the prompt
+    source: str = "claude"  # who wrote the SQL: "claude", "local:<model>" or "rehearsed"
 
 
 class NL2SQL:
@@ -106,14 +107,15 @@ class NL2SQL:
 
         for attempt in range(1, self.max_attempts + 1):
             answer, response = self._generate(system, messages)
+            source = getattr(response, "source", "claude")
             if not answer.answerable:
-                return NL2SQLResult(question, answer, None, attempt, errors, table_names)
+                return NL2SQLResult(question, answer, None, attempt, errors, table_names, source)
 
             try:
                 sql = check_sql(answer.sql)
                 answer.sql = sql
                 result = self.db.run(sql)
-                return NL2SQLResult(question, answer, result, attempt, errors, table_names)
+                return NL2SQLResult(question, answer, result, attempt, errors, table_names, source)
             except (UnsafeSQLError, *self.db.errors) as exc:
                 errors.append(f"{type(exc).__name__}: {exc}")
                 # Feed the error back so the model can repair its query.

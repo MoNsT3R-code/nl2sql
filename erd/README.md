@@ -35,10 +35,25 @@ Plain Python, nothing to install. 20,000 customers took 11 seconds to generate a
 `--seed` always produces the same data. All names, CNICs and account numbers are made up; IBANs use the
 fictional bank code NBMS.
 
-## Ask it questions in plain English
-
-The `nl2sql` tool at the root of this repository can query this database:
+## Demo: ask the bank questions in plain English, free and offline
 
 ```bash
-python -m nl2sql --db postgresql+psycopg://postgres@localhost/bank "Which customers missed a loan instalment?"
+pip install pgserver sqlalchemy "psycopg[binary]" pydantic
+ollama pull qwen2.5-coder:3b        # optional: the free local AI (about 2 GB, needs Ollama installed)
+python erd/run_demo.py              # opens http://127.0.0.1:8000
 ```
+
+`run_demo.py` starts a private PostgreSQL on this computer, loads the bank the first time, and opens the
+`nl2sql` web app on it. No API key and no internet connection are needed:
+
+- **25 rehearsed questions** ([`demo_questions.json`](demo_questions.json)) answer instantly with SQL
+  checked against this data, for example "Which Asaan accounts are dormant?" or "How many Raast
+  transfers were made and what was their total value?". Rephrasings still match.
+- **Any other question** goes to a small open model (`qwen2.5-coder:3b`) running in Ollama on the same
+  laptop. Nothing leaves the machine. On a laptop CPU an answer takes from several seconds to about a
+  minute; the page shows a timer while it works.
+- Every answer is labelled with who wrote the SQL (rehearsed, local AI or Claude), shows the SQL, and runs
+  read-only.
+
+With an Anthropic API key, `python -m nl2sql.web --db postgresql+psycopg://postgres@127.0.0.1:55432/bank`
+uses Claude instead, which is more accurate on hard questions.

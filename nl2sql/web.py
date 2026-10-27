@@ -28,6 +28,7 @@ def result_payload(res) -> dict:
         "attempts": res.attempts,
         "repairs": res.errors,
         "tables": res.tables,
+        "source": res.source,
     }
     if res.result is not None:
         payload.update(columns=res.result.columns, rows=res.result.rows,
