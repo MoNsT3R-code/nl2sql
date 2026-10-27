@@ -49,10 +49,18 @@ def add_db_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--sample-rows", type=int, default=0, metavar="N",
                         help="also send the AI N example rows per table (default 0: privacy mode, "
                              "only the question and the table structure are sent)")
+    parser.add_argument("--allow-personal-data", action="store_true",
+                        help="show CNICs, mobiles, emails, IBANs etc. unmasked (default: masked)")
+    parser.add_argument("--audit", default="nl2sql-audit.jsonl", metavar="FILE",
+                        help="where to record every question, query and decision (default nl2sql-audit.jsonl)")
 
 
 def make_engine(args) -> NL2SQL:
-    return NL2SQL(open_db(args.db), model=args.model, sample_rows=args.sample_rows)
+    from .security import SecurityLayer, SecurityPolicy
+
+    db = open_db(args.db)
+    security = SecurityLayer(db, SecurityPolicy(mask_personal_data=not args.allow_personal_data))
+    return NL2SQL(db, model=args.model, sample_rows=args.sample_rows, security=security, audit_log=args.audit)
 
 
 def main() -> None:

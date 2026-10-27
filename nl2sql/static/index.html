@@ -65,6 +65,7 @@
   .q-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
   .q-row .q { margin: 0; }
   .source { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
+  .source.blocked { color: var(--error); border-color: var(--error); }
   .pending { color: var(--muted); }
 </style>
 </head>
@@ -185,6 +186,11 @@ function renderResult(card, data) {
   clearInterval(card.timer);
   const label = sourceLabel(data.source);
   if (label) card.querySelector(".q-row").append(el("span", "source", label));
+  if (data.blocked) {
+    card.querySelector(".q-row").append(el("span", "source blocked", "Blocked · security layer"));
+    card.append(el("div", "note error", data.error));
+    return;
+  }
   if (data.error) {
     card.append(el("div", "note error", data.error));
     return;
@@ -203,6 +209,7 @@ function renderResult(card, data) {
   });
   sql.append(copy);
   card.append(sql, el("p", "explain", data.explanation), renderTable(data.columns, data.rows));
+  if (data.masked?.length) card.append(el("div", "muted", `Personal data masked: ${data.masked.join(", ")}.`));
   if (data.truncated) card.append(el("div", "muted", `Showing the first ${data.rows.length} rows.`));
   if (data.repairs.length) {
     card.append(el("div", "muted", `Fixed after ${data.repairs.length} failed attempt(s): ${data.repairs.join("; ")}`));

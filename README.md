@@ -126,6 +126,24 @@ Without Docker, load the same two files with your database's own client, e.g.
 6. **Refusals**: requests opt into server-side refusal fallbacks (`fallbacks: "default"`); a final
    `refusal` stop reason surfaces as an `NL2SQLError`.
 
+## Security layer
+
+On by default, in [`nl2sql/security.py`](nl2sql/security.py). Each layer works on its own, so one gap
+doesn't open the whole system:
+
+| Layer | What it stops |
+|---|---|
+| Question screening | Prompt injection ("ignore your instructions…"), requests to change or delete data, requests for passwords or keys, SQL-injection fragments, hidden control characters, very long input. Refused questions never reach the AI |
+| SQL inspection (a real parser, sqlglot) | Anything but one SELECT; writes hidden inside CTEs or subqueries; `SELECT INTO`, `FOR UPDATE`, `COPY`, `SET`, `ATTACH`, `PRAGMA`; system tables (`pg_catalog`, `information_schema`, `sqlite_master`); tables outside the app's own; file, network, sleep and server-info functions (`pg_read_file`, `dblink`, `pg_sleep`, `version()`…); generated rows (`generate_series`); recursive queries |
+| No second chances | A query that breaks a rule is refused outright, with no retry, so the AI can't probe for a way round |
+| Personal data | CNIC, mobile, email, IBAN, account and document numbers, date of birth and address are masked in results, including when the column is renamed or selected with `*`. Rebuilding them (substring, concatenation, passing through a subquery) is refused. A final scan masks any identifier-shaped text left in other columns. `--allow-personal-data` turns masking off |
+| Cost | On PostgreSQL the planner's estimate must stay under a limit, so runaway joins never start; every connection also has a statement timeout |
+| Web app | Localhost only, and it refuses to listen on a network address without `--token`; HttpOnly SameSite cookie or Bearer token; same-origin JSON only (no cross-site requests); 20 questions a minute per client; strict Content-Security-Policy and no framing |
+| Audit log | `nl2sql-audit.jsonl` records every question, the SQL, who asked, the decision and the rule that triggered it. It never records the data a query returned |
+
+`tests/test_security.py` attacks each layer with real techniques: over 60 malicious questions, queries and
+requests, plus checks that ordinary questions still work.
+
 ## Measuring accuracy
 
 There are two question sets of 20 each: `demo` (the small shop in `sample.db`) and `bank`. In each, 18
@@ -146,7 +164,7 @@ Use `--file` and `--db` to run your own question set against your own database.
 pytest
 ```
 
-74 tests, using a fake Claude client, so no API key or network is needed. The database tests run on
+165 tests, using a fake Claude client, so no API key or network is needed. The database tests run on
 both the SQLite driver and SQLAlchemy.
 
 ## Not yet done
